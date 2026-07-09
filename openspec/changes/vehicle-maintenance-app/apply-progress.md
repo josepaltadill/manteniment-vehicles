@@ -618,3 +618,48 @@ Siguiente bloque pendiente exacto:
 - PR boundary actual: remediación R3-001 para use-case/in-memory repository slice solamente.
 - Estrategia: `auto-chain`, `stacked-to-main`.
 - No se hizo commit ni se abrió PR.
+
+## Guardarraíles Supabase compartido — preparación PR 2
+
+### Contexto
+
+El usuario confirmó que Supabase ya existe en un VPS gestionado con Dokploy y planteó trabajar contra esa instancia real, usando tablas nuevas con prefijo `mv_`.
+
+### Decisión de seguridad
+
+Se permite preparar migraciones para la instancia real, pero no se ejecutará ninguna operación contra Supabase sin autorización explícita. Las migraciones deben limitarse a objetos `mv_*` y evitar comandos globales.
+
+### Guardarraíles creados
+
+- Se creó `supabase/migrations/README.md` con reglas obligatorias para migraciones en Supabase compartido.
+- Se actualizó `openspec/changes/vehicle-maintenance-app/tasks.md` para que la sección 5 exija estos guardarraíles antes de crear/aplicar SQL.
+
+### Verificación de conectividad/herramientas
+
+- MCP revisado: no hay MCP Supabase conectado en esta sesión.
+- Búsqueda MCP `supabase`: sin herramientas disponibles.
+- Búsqueda en repo: no existe script de puente Supabase ni carpeta `supabase/` previa; la carpeta se creó al documentar guardarraíles.
+
+### Reglas operativas
+
+- No ejecutar reset global de base de datos.
+- No ejecutar `drop schema`, `drop database` ni borrados no acotados.
+- Cualquier limpieza debe limitarse a tablas `mv_*`.
+- El SQL se revisa antes de ejecutarse contra la instancia real.
+- La ejecución real requiere autorización explícita.
+
+## Remediación de guardarraíles Supabase — review-risk
+
+### Hallazgos corregidos
+
+- R1-001: se eliminó `cascade` del ejemplo de limpieza de datos. Las limpiezas de prueba deben limitarse a tablas `mv_*` y fallar de forma segura si existen dependencias externas.
+- R1-002: se añadió como regla previa a ejecución real que las tablas nuevas tengan postura de acceso segura en Supabase: RLS activado sin políticas permisivas por defecto, revocación explícita de `anon`/`authenticated`, o excepción privada documentada y autorizada.
+
+### Archivos actualizados
+
+- `supabase/migrations/README.md`
+- `openspec/changes/vehicle-maintenance-app/tasks.md`
+
+### Estado
+
+No se ejecutó ninguna operación contra Supabase real. Solo se actualizaron guardarraíles y tareas.

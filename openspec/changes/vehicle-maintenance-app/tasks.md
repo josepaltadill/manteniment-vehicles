@@ -82,10 +82,11 @@ Rollback: revertir UI/actions sin alterar dominio ni migraciones.
 
 ### 5. PR 2 — Crear migraciones Supabase `mv_*`
 
-- [ ] RED: documentar/crear prueba de contrato SQL o snapshot en `supabase/migrations/*.test.ts` si el harness lo permite; si no, añadir checklist verificable en `supabase/migrations/README.md`.
-- [ ] GREEN: crear migración en `supabase/migrations/` para `mv_vehiculos` y `mv_eventos_vehiculo` con checks, claves foráneas e índices.
+- [ ] RED: documentar/crear prueba de contrato SQL o snapshot en `supabase/migrations/*.test.ts` si el harness lo permite; si no, añadir checklist verificable en `supabase/migrations/README.md` con guardarraíles para Supabase compartido/producción.
+- [ ] GREEN: crear migración en `supabase/migrations/` para `mv_vehiculos` y `mv_eventos_vehiculo` con checks, claves foráneas e índices, respetando los guardarraíles documentados.
 - [ ] GREEN: imponer unicidad global de `mv_vehiculos.matricula`, incluyendo vehículos inactivos.
 - [ ] GREEN: incluir prefijo `mv_` en todos los objetos SQL de esta app.
+- [ ] GREEN: dejar las tablas protegidas a nivel Supabase antes de ejecución real: RLS activado sin políticas permisivas por defecto, revocación explícita de `anon`/`authenticated`, o excepción privada documentada y autorizada.
 - [ ] REFACTOR: no crear tablas futuras de adjuntos/OCR/manuales; solo reservar nombres en documentación si hace falta.
 
 ### 6. PR 2 — Implementar adaptador Supabase solo de servidor
