@@ -1,2 +1,9 @@
 # Local Pi runtime state
 .atl/
+
+# Dependencias y artefactos locales
+node_modules/
+.next/
+coverage/
+.vitest/
+npm-debug.log*
