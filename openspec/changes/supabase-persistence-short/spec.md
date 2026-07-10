@@ -92,6 +92,16 @@ El sistema DEBE impedir datos operativos inválidos para vehículos y eventos.
 - CUANDO se informe un estado de vehículo o tipo de evento
 - ENTONCES el valor DEBE estar dentro de los valores aceptados por el dominio.
 
+### Requisito: Borrado coherente del hogar
+
+El borrado explícito de un hogar DEBE eliminar en cascada sus membresías, vehículos y eventos. Debido a que PostgreSQL no distingue la causa del borrado padre en una FK declarativa, borrar directamente un vehículo también elimina sus eventos; esta operación DEBE permanecer restringida a `admin`.
+
+#### Escenario: borrado explícito del hogar
+
+- DADO un hogar con membresías, vehículos y eventos
+- CUANDO un `admin` elimina explícitamente el hogar
+- ENTONCES la persistencia DEBE eliminar todos esos hijos sin dejar filas huérfanas.
+
 ### Requisito: RLS obligatoria por membresía
 
 El sistema DEBE habilitar RLS en todas las tablas `mv_*` del corte y DEBE permitir acceso solo a usuarios autenticados que sean miembros del hogar correspondiente.

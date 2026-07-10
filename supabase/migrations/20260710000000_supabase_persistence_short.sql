@@ -16,7 +16,7 @@ create table public.mv_household_members (
 
 create table public.mv_vehiculos (
   id uuid primary key default gen_random_uuid(),
-  household_id uuid not null references public.mv_households(id),
+  household_id uuid not null references public.mv_households(id) on delete cascade,
   marca text not null constraint mv_vehiculos_marca_check check (btrim(marca) <> ''),
   modelo text not null constraint mv_vehiculos_modelo_check check (btrim(modelo) <> ''),
   combustible text not null constraint mv_vehiculos_combustible_check check (btrim(combustible) <> ''),
@@ -51,7 +51,7 @@ create table public.mv_eventos_vehiculo (
   proximo_vencimiento_fecha timestamptz,
   fecha_creacion timestamptz not null default now(),
   constraint mv_eventos_vehiculo_vehiculo_household_fkey foreign key (household_id, vehiculo_id)
-    references public.mv_vehiculos (household_id, id)
+    references public.mv_vehiculos (household_id, id) on delete cascade
 );
 
 create index mv_household_members_user_household_idx on public.mv_household_members (user_id, household_id);

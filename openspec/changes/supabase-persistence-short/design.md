@@ -34,7 +34,7 @@ PK compuesta `(household_id, user_id)`. Un usuario podrá pertenecer a varios ho
 | Columna | Tipo | Reglas |
 | --- | --- | --- |
 | `id` | `uuid` | PK, `default gen_random_uuid()` |
-| `household_id` | `uuid` | FK a hogares, no nulo |
+| `household_id` | `uuid` | FK a hogares, no nulo, `on delete cascade` |
 | `marca`, `modelo`, `combustible`, `matricula` | `text` | no nulos y no vacíos |
 | `anio` | `integer` | no nulo, positivo |
 | `kilometros_actuales` | `integer` | no nulo, `>= 0` |
@@ -71,9 +71,10 @@ La migración no normalizará matrículas silenciosamente. El futuro adaptador d
 ```sql
 foreign key (household_id, vehiculo_id)
   references mv_vehiculos (household_id, id)
+  on delete cascade
 ```
 
-Así la base impide eventos cruzados entre hogares sin trigger. No se define borrado en cascada desde vehículos: un vehículo con historial no podrá eliminarse accidentalmente.
+Así la base impide eventos cruzados entre hogares sin trigger y mantiene coherente el borrado explícito de un hogar: hogar → vehículos → eventos. PostgreSQL no puede distinguir en una FK simple si un vehículo se elimina directamente o como consecuencia del borrado del hogar; por eso la misma cascada también elimina el historial al borrar directamente un vehículo. Se acepta este tradeoff para evitar hogares parcialmente borrados y eventos huérfanos; la autorización RLS de borrado de vehículos sigue limitada a `admin`.
 
 ## Índices
 
@@ -214,7 +215,7 @@ El cambio de implementación deberá:
 
 - Las funciones `security definer` reducen recursión y duplicación, pero elevan el impacto de un error de permisos o `search_path`; por eso su interfaz es mínima.
 - Duplicar `household_id` en eventos añade almacenamiento, pero permite RLS directa e integridad declarativa mediante FK compuesta.
-- El borrado en cascada hogar→miembros simplifica membresías; vehículos y eventos quedan restrictivos para proteger historial.
+- El borrado en cascada hogar→miembros y hogar→vehículos→eventos mantiene coherente la eliminación explícita del hogar. Como una FK no conoce la causa del borrado padre, eliminar directamente un vehículo también elimina sus eventos; se acepta ese riesgo frente a un hogar parcialmente borrado, y la operación continúa restringida a `admin` por RLS.
 - La validación estática no demuestra el comportamiento runtime de RLS. No debe confundirse revisión satisfactoria con autorización para migrar.
 - La comparación de matrícula será sensible al valor persistido hasta que el adaptador defina normalización canónica.
 

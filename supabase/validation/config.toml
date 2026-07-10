@@ -1,0 +1,23 @@
+# Copied only to a mktemp workspace by validate-supabase-rls.sh.
+# DB and Auth stay enabled because auth.users, auth.uid(), anon and authenticated are
+# part of the migration's runtime contract. API, Studio, local email and Analytics are
+# disabled to minimise the ephemeral surface.
+project_id = "__PROJECT_ID__"
+
+[api]
+enabled = false
+
+[db]
+port = 54329
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = false
+
+[analytics]
+enabled = false
+
+[auth]
+enabled = true

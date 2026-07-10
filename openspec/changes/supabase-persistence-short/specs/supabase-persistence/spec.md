@@ -80,6 +80,16 @@ The system MUST reject invalid operational data for vehicles and events.
 - WHEN a vehicle state or event type is provided
 - THEN the value MUST belong to the domain's accepted values.
 
+### Requirement: Coherent Household Deletion
+
+Explicit household deletion MUST cascade to its memberships, vehicles, and events. Because PostgreSQL declarative foreign keys cannot distinguish why a parent vehicle was deleted, directly deleting a vehicle also deletes its events; that operation MUST remain restricted to `admin`.
+
+#### Scenario: Explicit household deletion
+
+- GIVEN a household with memberships, vehicles, and events
+- WHEN an `admin` explicitly deletes the household
+- THEN persistence MUST delete all those children without leaving orphaned rows.
+
 ### Requirement: RLS Uses Household Membership
 
 The system MUST enable RLS on every `mv_*` table in this slice and MUST allow access only to authenticated users who are members of the related household.

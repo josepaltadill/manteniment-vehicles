@@ -14,6 +14,7 @@ Este proyecto usa una instancia Supabase compartida. Las migraciones deben trata
 - No se crean tablas futuras de adjuntos, OCR, IA, manuales ni notificaciones en este MVP.
 - La matrícula debe ser única por `(household_id, matricula)` en `mv_vehiculos`, incluyendo vehículos inactivos.
 - Vehículos y eventos requieren `household_id`; los eventos deben usar una FK compuesta `(household_id, vehiculo_id)` hacia vehículos para impedir cruces entre hogares.
+- El borrado explícito de un hogar elimina en cascada sus membresías, vehículos y eventos. La FK vehículo→eventos también implica que borrar directamente un vehículo elimina su historial: PostgreSQL no distingue la causa del borrado padre, por lo que se acepta este tradeoff para mantener coherencia y el borrado directo sigue reservado a `admin` por RLS.
 - Los roles son `admin` y `editor`: solo `admin` administra hogares y membresías; ambos operan vehículos y eventos. El primer `admin` se crea únicamente mediante bootstrap server-only, nunca mediante una policy autenticada.
 - Un hogar no puede perder su último `admin` mediante un `update` o `delete` normal de membresía autenticada; esta invariante crítica se aplica en PostgreSQL con triggers `mv_*`, no solo en RLS o en código de aplicación.
 - Las funciones RLS de membresía usan `security definer`, `stable`, `search_path` vacío, referencias cualificadas y ejecución solo para `authenticated`.
@@ -113,6 +114,37 @@ Umbrales para tasa de errores o porcentaje fuera de SLO: **>1%** el release owne
 - [ ] No se usa `cascade` en limpiezas de datos.
 - [ ] La migración fue revisada antes de ejecutarse.
 - [ ] La operación contra la instancia real fue autorizada explícitamente.
+
+## Validación runtime local de RLS (PR/corte 1)
+
+El harness del primer corte está disponible para revisar su contrato y ejecutarlo **solo** cuando estén disponibles Supabase CLI y Docker locales:
+
+```bash
+./scripts/validate-supabase-rls.sh
+```
+
+### Requisitos y recorrido seguro
+
+1. Ejecutar desde un checkout limpio, sin `DATABASE_URL`, `SUPABASE_URL`, project ref, endpoint MCP ni credenciales Supabase en el entorno.
+2. El script comprueba primero, sin mutar, la migración, `supabase --version`, `docker --version`, acceso al daemon y la ayuda de la CLI que va a usar.
+3. Solo después crea un directorio `mktemp` privado y un proyecto con prefijo `mv-rls-validation-`; nunca acepta ni deriva un destino externo.
+4. Antes de SQL, exige un único contenedor DB con labels, red y fecha que demuestren su propiedad. SQL se ejecuta únicamente mediante `docker exec` sobre el ID capturado.
+
+Supabase CLI 2.109.1 publica los servicios locales en `0.0.0.0`/`[::]`. El harness permite esa exposición únicamente después de probar que Docker usa un socket Unix local y que el contenedor pertenece al proyecto efímero generado; la informa como `WARN`, no como `PASS` silencioso. Mientras se ejecuta, esos puertos pueden ser accesibles desde otras interfaces del host, por lo que debe usarse solo en una máquina de desarrollo confiable y detenerse al finalizar.
+
+El comando no usa ni permite `db push`, `db reset`, `migration up`, URLs externas, MCP, claves compartidas, `drop database` ni `drop schema`. Si falta una herramienta o la guardia no puede demostrar el destino, informa `BLOCKED` y termina distinto de cero sin iniciar SQL ni limpiar recursos ambiguos. La salida de `supabase start` se captura en un log privado del workspace y nunca se reimprime; tampoco se ejecuta ni imprime `supabase status`, porque ambas salidas pueden incluir secretos.
+
+### Límite explícito del corte 1
+
+El corte 1 implementa el preflight, guardas, workspace efímero, migración aislada, fixtures y matriz secuencial. Su salida termina siempre con:
+
+```text
+BLOCKED: concurrency pending
+```
+
+Por diseño, su código de salida es distinto de cero. No autoriza aplicar la migración a Supabase real, compartido o persistente. El corte 2 debe añadir y aprobar las dos sesiones concurrentes de retirada del último administrador, además del gate final, antes de retirar ese bloqueo.
+
+`npm test` cubre contratos deterministas del shell, incluido el rechazo de destinos externos/remotos, la propiedad del contenedor, la captura de secretos y la aceptación condicionada del binding wildcard local; no sustituye la ejecución RLS runtime con Supabase CLI + Docker.
 
 ## Estado de conexión actual
 
