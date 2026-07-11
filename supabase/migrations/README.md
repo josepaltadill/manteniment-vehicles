@@ -283,6 +283,27 @@ aplicación. El script reporta `householdId`/`userId` sembrados y sale con
 código 0 en éxito; falla con código distinto de 0 y un mensaje explícito en
 stderr si falta alguna variable privada o si la siembra falla.
 
+El presupuesto de conexión (timeout, reintentos, backoff) tiene valores por
+defecto pensados para una base ya despierta (5s de timeout, 3 intentos), que
+pueden no alcanzar contra un proyecto Supabase pausado/frío. Es ajustable sin
+tocar código vía variables opcionales:
+
+```sh
+SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS=20000 \
+SUPABASE_BOOTSTRAP_CONNECT_RETRIES=5 \
+SUPABASE_BOOTSTRAP_CONNECT_BACKOFF_MS=500 \
+npm run bootstrap:admin
+```
+
+Sin definirlas, se usan los valores por defecto. Un valor no numérico o no
+positivo falla explícito antes de intentar conectar.
+
+Si el usuario/hogar sembrados ya tienen una membresía con un rol distinto de
+`admin` (por ejemplo, alguien lo degradó a `editor` manualmente), el bootstrap
+**no la sobrescribe**: falla explícito con `ErrorMembresiaNoAdminBootstrap` y
+requiere resolución manual. Reejecutar el bootstrap nunca debe revertir en
+silencio una decisión de rol tomada fuera de él.
+
 Si el usuario/hogar sembrados ya tienen una membresía con un rol distinto de
 `admin` (por ejemplo, alguien lo degradó a `editor` manualmente), el bootstrap
 **no la sobrescribe**: falla explícito con `ErrorMembresiaNoAdminBootstrap` y

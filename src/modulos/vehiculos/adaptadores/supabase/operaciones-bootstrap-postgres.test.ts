@@ -410,6 +410,12 @@ describe('ejecutarBootstrapPostgresDesdeEntorno', () => {
     SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Hogar de desarrollo',
   };
 
+  function dependenciasFalsas() {
+    const crearOperaciones = vi.fn(async () => ({ cerrar: vi.fn(async () => undefined) }));
+    const sembrar = vi.fn(async () => ({ householdId: { valor: 'x' }, userId: { valor: 'y' } }));
+    return { crearOperaciones, sembrar };
+  }
+
   it('ejecuta la siembra con variables privadas y cierra la conexión al completar', async () => {
     const operaciones = { cerrar: vi.fn(async () => undefined) };
     const crearOperaciones = vi.fn(async () => operaciones);
@@ -420,7 +426,11 @@ describe('ejecutarBootstrapPostgresDesdeEntorno', () => {
       sembrar: sembrar as never,
     });
 
-    expect(crearOperaciones).toHaveBeenCalledWith(entorno.SUPABASE_BOOTSTRAP_DATABASE_URL);
+    expect(crearOperaciones).toHaveBeenCalledWith(entorno.SUPABASE_BOOTSTRAP_DATABASE_URL, {
+      connectionTimeoutMillis: undefined,
+      intentosConexion: undefined,
+      backoffBaseMs: undefined,
+    });
     expect(sembrar).toHaveBeenCalledWith(operaciones, {
       bootstrapEmail: entorno.SUPABASE_BOOTSTRAP_EMAIL,
       bootstrapPassword: entorno.SUPABASE_BOOTSTRAP_PASSWORD,
@@ -468,12 +478,6 @@ describe('ejecutarBootstrapPostgresDesdeEntorno', () => {
   });
 
   describe('validación de variables privadas', () => {
-    function dependenciasFalsas() {
-      const crearOperaciones = vi.fn(async () => ({ cerrar: vi.fn(async () => undefined) }));
-      const sembrar = vi.fn(async () => ({ householdId: { valor: 'x' }, userId: { valor: 'y' } }));
-      return { crearOperaciones, sembrar };
-    }
-
     it.each([
       'SUPABASE_BOOTSTRAP_DATABASE_URL',
       'SUPABASE_BOOTSTRAP_EMAIL',
@@ -510,6 +514,59 @@ describe('ejecutarBootstrapPostgresDesdeEntorno', () => {
       ).rejects.toThrow(new RegExp(`Falta la variable privada obligatoria ${variableVacia}`));
       expect(crearOperaciones).not.toHaveBeenCalled();
       expect(sembrar).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('presupuesto de conexión configurable por variables de entorno', () => {
+    it('pasa SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS/_RETRIES/_BACKOFF_MS a crearOperaciones', async () => {
+      const { crearOperaciones, sembrar } = dependenciasFalsas();
+
+      await ejecutarBootstrapPostgresDesdeEntorno(
+        {
+          ...entorno,
+          SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS: '20000',
+          SUPABASE_BOOTSTRAP_CONNECT_RETRIES: '5',
+          SUPABASE_BOOTSTRAP_CONNECT_BACKOFF_MS: '500',
+        },
+        { crearOperaciones: crearOperaciones as never, sembrar: sembrar as never },
+      );
+
+      expect(crearOperaciones).toHaveBeenCalledWith(entorno.SUPABASE_BOOTSTRAP_DATABASE_URL, {
+        connectionTimeoutMillis: 20_000,
+        intentosConexion: 5,
+        backoffBaseMs: 500,
+      });
+    });
+
+    it('usa los valores por defecto (undefined) si las variables no están definidas', async () => {
+      const { crearOperaciones, sembrar } = dependenciasFalsas();
+
+      await ejecutarBootstrapPostgresDesdeEntorno(entorno, {
+        crearOperaciones: crearOperaciones as never,
+        sembrar: sembrar as never,
+      });
+
+      expect(crearOperaciones).toHaveBeenCalledWith(entorno.SUPABASE_BOOTSTRAP_DATABASE_URL, {
+        connectionTimeoutMillis: undefined,
+        intentosConexion: undefined,
+        backoffBaseMs: undefined,
+      });
+    });
+
+    it.each([
+      ['SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS', 'abc'],
+      ['SUPABASE_BOOTSTRAP_CONNECT_RETRIES', '0'],
+      ['SUPABASE_BOOTSTRAP_CONNECT_BACKOFF_MS', '-100'],
+    ])('falla con un mensaje claro si %s no es un número positivo (%s)', async (variable, valorInvalido) => {
+      const { crearOperaciones, sembrar } = dependenciasFalsas();
+
+      await expect(
+        ejecutarBootstrapPostgresDesdeEntorno(
+          { ...entorno, [variable]: valorInvalido },
+          { crearOperaciones: crearOperaciones as never, sembrar: sembrar as never },
+        ),
+      ).rejects.toThrow(new RegExp(`${variable} debe ser un número positivo`));
+      expect(crearOperaciones).not.toHaveBeenCalled();
     });
   });
 });
