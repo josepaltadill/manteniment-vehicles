@@ -1,4 +1,5 @@
 import 'server-only';
+import { esRolUsuario, type RolUsuario } from '../../dominio/rol-usuario';
 import {
   sembrarHogarDeDesarrollo,
   type EntradaBootstrap,
@@ -17,6 +18,13 @@ export type ClientePostgresBootstrap = Readonly<{
 type FilaId = Readonly<{ id: string }>;
 type FilaCantidad = Readonly<{ cantidad: string | number }>;
 type FilaMembresia = Readonly<{ rol: string }>;
+
+// btrim(nombre) de un solo argumento solo recorta el carácter espacio; un
+// nombre con un tab o salto de línea al final no se reconocería como
+// duplicado de la variante con espacio normal. Este set de caracteres debe
+// coincidir exactamente con el del índice único en
+// supabase/migrations/20260711000000_mv_households_nombre_unique.sql.
+const CARACTERES_ESPACIO_SQL = "E' \\t\\n\\r'";
 
 /**
  * Implementación administrativa y server-only del puerto de bootstrap.
@@ -64,7 +72,12 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
 
   async buscarHogarPorNombre(nombre: string): Promise<FilaId | null> {
     return primeraFila<FilaId>(
-      this.cliente.query('select id from public.mv_households where nombre = $1 limit 1', [nombre]),
+      this.cliente.query(
+        `select id from public.mv_households
+         where lower(btrim(nombre, ${CARACTERES_ESPACIO_SQL})) = lower(btrim($1, ${CARACTERES_ESPACIO_SQL}))
+         limit 1`,
+        [nombre],
+      ),
     );
   }
 
@@ -73,9 +86,10 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
       this.cliente.query(
         `insert into public.mv_households (nombre)
          values ($1)
-         on conflict (nombre) do update set nombre = excluded.nombre
+         on conflict (lower(btrim(nombre, ${CARACTERES_ESPACIO_SQL})))
+         do update set nombre = mv_households.nombre
          returning id`,
-        [nombre],
+        [nombre.trim()],
       ),
     );
 
@@ -86,21 +100,28 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
   async contarHogaresPorNombre(nombre: string): Promise<number> {
     const fila = await primeraFila<FilaCantidad>(
       this.cliente.query(
-        'select count(*)::text as cantidad from public.mv_households where nombre = $1',
+        `select count(*)::text as cantidad from public.mv_households
+         where lower(btrim(nombre, ${CARACTERES_ESPACIO_SQL})) = lower(btrim($1, ${CARACTERES_ESPACIO_SQL}))`,
         [nombre],
       ),
     );
     return Number(fila?.cantidad ?? 0);
   }
 
-  async buscarMembresia(householdId: string, userId: string): Promise<FilaMembresia | null> {
-    return primeraFila<FilaMembresia>(
+  async buscarMembresia(householdId: string, userId: string): Promise<{ rol: RolUsuario } | null> {
+    const fila = await primeraFila<FilaMembresia>(
       this.cliente.query(
         `select rol from public.mv_household_members
          where household_id = $1 and user_id = $2 limit 1`,
         [householdId, userId],
       ),
     );
+
+    if (!fila) return null;
+    if (!esRolUsuario(fila.rol)) {
+      throw new Error(`Rol de membresía desconocido: ${fila.rol}`);
+    }
+    return { rol: fila.rol };
   }
 
   async crearMembresiaAdmin(householdId: string, userId: string): Promise<void> {

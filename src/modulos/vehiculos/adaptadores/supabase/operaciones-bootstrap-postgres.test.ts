@@ -34,7 +34,7 @@ describe('OperacionesBootstrapPostgres', () => {
     expect(cliente.query.mock.calls[0]?.[0]).toContain('on conflict (email)');
   });
 
-  it('crea o reutiliza el hogar usando la restricción única de nombre', async () => {
+  it('crea o reutiliza el hogar usando el índice único normalizado de nombre', async () => {
     const cliente = crearCliente();
     const operaciones = new OperacionesBootstrapPostgres(cliente);
 
@@ -44,7 +44,76 @@ describe('OperacionesBootstrapPostgres', () => {
       expect.stringContaining('insert into public.mv_households'),
       ['Hogar de desarrollo'],
     );
-    expect(cliente.query.mock.calls[0]?.[0]).toContain('on conflict (nombre)');
+    expect(cliente.query.mock.calls[0]?.[0]).toContain("on conflict (lower(btrim(nombre, E' \\t\\n\\r')))");
+  });
+
+  it('no sobrescribe el nombre canónico ya guardado cuando el conflicto lo dispara una variante', async () => {
+    const cliente = crearCliente();
+    const operaciones = new OperacionesBootstrapPostgres(cliente);
+
+    await operaciones.crearHogar('hogar de desarrollo');
+
+    // `do update set nombre = mv_households.nombre` (no `excluded.nombre`): el
+    // conflicto ahora dispara para variantes de mayúsculas/espacios, no solo
+    // coincidencias exactas, así que "actualizar" con el valor entrante
+    // reescribiría en silencio el nombre canónico guardado.
+    expect(cliente.query.mock.calls[0]?.[0]).toContain('do update set nombre = mv_households.nombre');
+    expect(cliente.query.mock.calls[0]?.[0]).not.toContain('excluded.nombre');
+  });
+
+  it('recorta espacios del nombre del hogar antes de guardarlo', async () => {
+    const cliente = crearCliente();
+    const operaciones = new OperacionesBootstrapPostgres(cliente);
+
+    await operaciones.crearHogar('  Hogar de desarrollo  ');
+
+    expect(cliente.query).toHaveBeenCalledWith(expect.stringContaining('insert into public.mv_households'), [
+      'Hogar de desarrollo',
+    ]);
+  });
+
+  it('busca el hogar por nombre comparando sin distinguir mayúsculas ni espacios', async () => {
+    const cliente = crearCliente();
+    const operaciones = new OperacionesBootstrapPostgres(cliente);
+
+    await operaciones.buscarHogarPorNombre('  Hogar DE Desarrollo  ');
+
+    expect(cliente.query).toHaveBeenCalledWith(
+      expect.stringContaining("lower(btrim(nombre, E' \\t\\n\\r')) = lower(btrim($1, E' \\t\\n\\r'))"),
+      ['  Hogar DE Desarrollo  '],
+    );
+  });
+
+  it('cuenta hogares por nombre comparando sin distinguir mayúsculas ni espacios', async () => {
+    const cliente = crearCliente();
+    const operaciones = new OperacionesBootstrapPostgres(cliente);
+
+    await operaciones.contarHogaresPorNombre('  Hogar DE Desarrollo  ');
+
+    expect(cliente.query).toHaveBeenCalledWith(
+      expect.stringContaining("lower(btrim(nombre, E' \\t\\n\\r')) = lower(btrim($1, E' \\t\\n\\r'))"),
+      ['  Hogar DE Desarrollo  '],
+    );
+  });
+
+  it('busca la membresía y devuelve un rol tipado como RolUsuario', async () => {
+    const cliente = { query: vi.fn(async () => ({ rows: [{ rol: 'editor' }] })) } as unknown as ClientePostgresBootstrap & {
+      query: ReturnType<typeof vi.fn>;
+    };
+    const operaciones = new OperacionesBootstrapPostgres(cliente);
+
+    const membresia = await operaciones.buscarMembresia('hogar-1', 'usuario-1');
+
+    expect(membresia).toEqual({ rol: 'editor' });
+  });
+
+  it('lanza si la base devuelve un rol de membresía desconocido', async () => {
+    const cliente = { query: vi.fn(async () => ({ rows: [{ rol: 'superadmin' }] })) } as unknown as ClientePostgresBootstrap & {
+      query: ReturnType<typeof vi.fn>;
+    };
+    const operaciones = new OperacionesBootstrapPostgres(cliente);
+
+    await expect(operaciones.buscarMembresia('hogar-1', 'usuario-1')).rejects.toThrow(/rol.*desconocido/i);
   });
 
   it('crea la membresía admin idempotentemente sin interpolar identificadores', async () => {

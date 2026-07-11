@@ -69,7 +69,7 @@ describe('sustituirTablaEnMigracion', () => {
 });
 
 ejecutar('preflight de la migración de unicidad de hogares (Postgres local)', () => {
-  it('rechaza la migración con un mensaje claro si ya existen nombres duplicados', async () => {
+  it('rechaza la migración si ya existen nombres duplicados exactos', async () => {
     const cliente = new Client({ connectionString: databaseUrl });
     await cliente.connect();
     const tabla = `mvhp_${randomUUID().slice(0, 8)}`;
@@ -81,18 +81,51 @@ ejecutar('preflight de la migración de unicidad de hogares (Postgres local)', (
       await expect(ejecutarMigracionContraTabla(cliente, tabla)).rejects.toThrow(/nombre\(s\) duplicado\(s\)/);
       await cliente.query('rollback');
 
-      const constraints = await cliente.query(
-        `select conname from pg_constraint where conrelid = $1::regclass`,
-        [`public.${tabla}`],
-      );
-      expect(constraints.rows).toEqual([]);
+      const indices = await cliente.query(`select indexname from pg_indexes where tablename = $1`, [tabla]);
+      expect(indices.rows).toEqual([]);
     } finally {
       await cliente.query(`drop table if exists public.${tabla}`);
       await cliente.end();
     }
   });
 
-  it('aplica la restricción única sin error cuando no hay nombres duplicados', async () => {
+  it('rechaza la migración si los nombres duplicados solo difieren en mayúsculas o espacios', async () => {
+    const cliente = new Client({ connectionString: databaseUrl });
+    await cliente.connect();
+    const tabla = `mvhp_${randomUUID().slice(0, 8)}`;
+
+    try {
+      await cliente.query(`create table public.${tabla} (nombre text not null)`);
+      await cliente.query(`insert into public.${tabla} (nombre) values ('Hogar Duplicado'), (' hogar duplicado ')`);
+
+      await expect(ejecutarMigracionContraTabla(cliente, tabla)).rejects.toThrow(/nombre\(s\) duplicado\(s\)/);
+      await cliente.query('rollback');
+    } finally {
+      await cliente.query(`drop table if exists public.${tabla}`);
+      await cliente.end();
+    }
+  });
+
+  it('rechaza la migración si los nombres duplicados solo difieren en tabs o saltos de línea', async () => {
+    const cliente = new Client({ connectionString: databaseUrl });
+    await cliente.connect();
+    const tabla = `mvhp_${randomUUID().slice(0, 8)}`;
+
+    try {
+      await cliente.query(`create table public.${tabla} (nombre text not null)`);
+      await cliente.query(
+        `insert into public.${tabla} (nombre) values ('Hogar Tab'), (E'\\tHogar Tab\\n')`,
+      );
+
+      await expect(ejecutarMigracionContraTabla(cliente, tabla)).rejects.toThrow(/nombre\(s\) duplicado\(s\)/);
+      await cliente.query('rollback');
+    } finally {
+      await cliente.query(`drop table if exists public.${tabla}`);
+      await cliente.end();
+    }
+  });
+
+  it('crea el índice único normalizado y rechaza variantes de mayúsculas/espacios/tabs al insertar', async () => {
     const cliente = new Client({ connectionString: databaseUrl });
     await cliente.connect();
     const tabla = `mvhp_${randomUUID().slice(0, 8)}`;
@@ -103,11 +136,16 @@ ejecutar('preflight de la migración de unicidad de hogares (Postgres local)', (
 
       await expect(ejecutarMigracionContraTabla(cliente, tabla)).resolves.not.toThrow();
 
-      const constraints = await cliente.query(
-        `select conname from pg_constraint where conrelid = $1::regclass`,
-        [`public.${tabla}`],
-      );
-      expect(constraints.rows).toEqual([{ conname: `${tabla}_nombre_key` }]);
+      const indices = await cliente.query(`select indexname from pg_indexes where tablename = $1`, [tabla]);
+      expect(indices.rows).toEqual([{ indexname: `${tabla}_nombre_key` }]);
+
+      await expect(
+        cliente.query(`insert into public.${tabla} (nombre) values ('  hogar a  ')`),
+      ).rejects.toThrow(/duplicate key value violates unique constraint/);
+
+      await expect(
+        cliente.query(`insert into public.${tabla} (nombre) values (E'\\thogar a\\n')`),
+      ).rejects.toThrow(/duplicate key value violates unique constraint/);
     } finally {
       await cliente.query(`drop table if exists public.${tabla}`);
       await cliente.end();
