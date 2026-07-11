@@ -99,6 +99,31 @@ describe('detectarImportadorNoPermitidoDeBootstrap', () => {
 
     expect(detectarImportadorNoPermitidoDeBootstrap('componente.tsx', contenido)).toBe(false);
   });
+
+  it('reporta un import() dinámico de operaciones-bootstrap-postgres fuera de la allowlist', () => {
+    const contenido =
+      "const { crearOperacionesBootstrapPostgres } = await import('../modulos/vehiculos/adaptadores/supabase/operaciones-bootstrap-postgres');\n";
+
+    expect(detectarImportadorNoPermitidoDeBootstrap('accion-indebida.ts', contenido)).toBe(true);
+  });
+
+  it('reporta un require() de bootstrap-servidor fuera de la allowlist', () => {
+    const contenido = "const { sembrarHogarDeDesarrollo } = require('./bootstrap-servidor');\n";
+
+    expect(detectarImportadorNoPermitidoDeBootstrap('accion-indebida.ts', contenido)).toBe(true);
+  });
+
+  it('no reporta un archivo distinto con el mismo nombre base que un importador permitido', () => {
+    // El allowlist debe matchear por ruta completa, no solo por nombre de
+    // archivo: un `bootstrap-admin.ts` en un directorio distinto al runner
+    // real no debería quedar permitido solo por compartir nombre.
+    const contenido =
+      "import { crearOperacionesBootstrapPostgres } from '../adaptadores/supabase/operaciones-bootstrap-postgres';\n";
+
+    expect(
+      detectarImportadorNoPermitidoDeBootstrap('src/modulos/otro/bootstrap-admin.ts', contenido),
+    ).toBe(true);
+  });
 });
 
 describe('guardas de seguridad sobre el repositorio real', () => {

@@ -39,7 +39,10 @@ const CARACTERES_ESPACIO_SQL = "E' \\t\\n\\r'";
  * compilación server-side. La protección real contra eso es la allowlist en
  * `seguridad-servidor.ts` (`detectarImportadoresNoPermitidosDeBootstrap`):
  * solo `operaciones-bootstrap-postgres.ts` (a sí mismo) y `scripts/bootstrap-admin.ts`
- * pueden importar este módulo; cualquier otro importador falla el test.
+ * pueden importar este módulo; el test falla si aparece un import estático o
+ * dinámico (`import()`/`require()`) desde cualquier otro archivo. No cubre un
+ * re-export vía barrel ni un alias de `tsconfig.json` que renombre el
+ * specifier sin conservar el nombre del módulo.
  */
 export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
   constructor(private readonly cliente: ClientePostgresBootstrap) {}

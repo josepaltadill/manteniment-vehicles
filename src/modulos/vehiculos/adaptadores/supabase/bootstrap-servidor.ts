@@ -22,7 +22,10 @@
 // compilación server-side. La protección real contra eso es la allowlist en
 // `seguridad-servidor.ts` (`detectarImportadoresNoPermitidosDeBootstrap`):
 // solo `operaciones-bootstrap-postgres.ts` y `scripts/bootstrap-admin.ts`
-// pueden importar este módulo; cualquier otro importador falla el test.
+// pueden importar este módulo; el test falla si aparece un import estático o
+// dinámico (`import()`/`require()`) desde cualquier otro archivo. No cubre un
+// re-export vía barrel ni un alias de `tsconfig.json` que renombre el
+// specifier sin conservar el nombre del módulo.
 import 'server-only';
 import { crearIdentificador, type Identificador } from '../../../../compartido/dominio/identificador';
 import type { RolUsuario } from '../../dominio/rol-usuario';
