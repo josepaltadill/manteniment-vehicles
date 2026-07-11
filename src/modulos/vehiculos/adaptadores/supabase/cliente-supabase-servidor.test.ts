@@ -3,7 +3,7 @@ import type { EntornoSupabase } from '../../../../compartido/infraestructura/ent
 import { ErrorAdaptadorSupabase } from './errores-adaptador';
 
 const signInWithPassword = vi.fn();
-const createClientMock = vi.fn(() => ({
+const createClientMock = vi.fn((..._args: unknown[]) => ({
   auth: { signInWithPassword },
 }));
 

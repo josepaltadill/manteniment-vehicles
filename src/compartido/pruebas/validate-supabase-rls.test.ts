@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 
 type RunOptions = {
-  env?: NodeJS.ProcessEnv;
+  env?: Record<string, string | undefined>;
   path?: string;
 };
 

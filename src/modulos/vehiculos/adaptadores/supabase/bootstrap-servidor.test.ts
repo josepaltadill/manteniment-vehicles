@@ -13,7 +13,9 @@ const entornoBootstrap = {
   bootstrapHouseholdNombre: 'Hogar de desarrollo',
 };
 
-function crearOperacionesFalsas(): { operaciones: OperacionesBootstrap; estado: {
+function crearOperacionesFalsas(
+  overrides: Partial<OperacionesBootstrap> = {},
+): { operaciones: OperacionesBootstrap; estado: {
   usuario: { id: string } | null;
   hogar: { id: string } | null;
   membresia: { rol: RolUsuario } | null;
@@ -41,6 +43,7 @@ function crearOperacionesFalsas(): { operaciones: OperacionesBootstrap; estado: 
     crearMembresiaAdmin: vi.fn(async () => {
       estado.membresia = { rol: 'admin' };
     }),
+    ...overrides,
   };
 
   return { operaciones, estado };
@@ -73,10 +76,9 @@ describe('sembrarHogarDeDesarrollo', () => {
   });
 
   it('detecta una condición de carrera y lanza un error tipado si tras crear el hogar existe más de uno con el mismo nombre', async () => {
-    const { operaciones } = crearOperacionesFalsas();
     // Simula dos bootstraps concurrentes: ambos buscan (no existe todavía), ambos crean.
     // El re-query tras crear detecta que ahora hay 2 hogares con el mismo nombre.
-    operaciones.contarHogaresPorNombre = vi.fn(async () => 2);
+    const { operaciones } = crearOperacionesFalsas({ contarHogaresPorNombre: vi.fn(async () => 2) });
 
     let errorCapturado: unknown;
     try {
