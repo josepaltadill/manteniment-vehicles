@@ -108,4 +108,25 @@ describe('ejecutarBootstrapPostgresDesdeEntorno', () => {
 
     expect(operaciones.cerrar).toHaveBeenCalledOnce();
   });
+
+  it('propaga el error de siembra en vez del error de cierre cuando ambos fallan', async () => {
+    const errorSiembra = new Error('fallo de siembra');
+    const errorCierre = new Error('fallo de cierre');
+    const operaciones = {
+      cerrar: vi.fn(async () => {
+        throw errorCierre;
+      }),
+    };
+
+    await expect(
+      ejecutarBootstrapPostgresDesdeEntorno(entorno, {
+        crearOperaciones: vi.fn(async () => operaciones) as never,
+        sembrar: vi.fn(async () => {
+          throw errorSiembra;
+        }) as never,
+      }),
+    ).rejects.toBe(errorSiembra);
+
+    expect(operaciones.cerrar).toHaveBeenCalledOnce();
+  });
 });

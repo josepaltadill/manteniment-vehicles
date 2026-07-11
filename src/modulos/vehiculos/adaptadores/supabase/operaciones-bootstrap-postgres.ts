@@ -158,11 +158,23 @@ export async function ejecutarBootstrapPostgresDesdeEntorno(
   };
   const operaciones = await dependencias.crearOperaciones(databaseUrl);
 
+  let resultado: Awaited<ReturnType<typeof dependencias.sembrar>>;
   try {
-    return await dependencias.sembrar(operaciones, entrada);
-  } finally {
-    await operaciones.cerrar();
+    resultado = await dependencias.sembrar(operaciones, entrada);
+  } catch (errorSiembra) {
+    try {
+      await operaciones.cerrar();
+    } catch (errorCierre) {
+      console.error(
+        'Fallo al cerrar la conexión administrativa de bootstrap tras un error de siembra.',
+        { errorSiembra, errorCierre },
+      );
+    }
+    throw errorSiembra;
   }
+
+  await operaciones.cerrar();
+  return resultado;
 }
 
 function exigirVariablePrivada(entorno: EntornoBootstrapPostgres, nombre: string): string {
