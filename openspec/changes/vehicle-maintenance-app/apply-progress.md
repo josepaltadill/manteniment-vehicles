@@ -914,3 +914,529 @@ Creados:
 - Estrategia: `auto-chain`, `stacked-to-main`.
 - No se hizo commit (pendiente de confirmación explícita del usuario/orquestador).
 - Verificación de cierre: `npm test` → 17 archivos, 120 tests, todos en verde. `npm run build` → verde con Next.js 16.2.10.
+
+## PR 3 — Interfaz mínima Next.js y server actions (tareas 10–13, corte final)
+
+### Estado estructurado consumido/producido
+
+- Proyecto: `manteniment-vehicles`
+- Cambio activo: `vehicle-maintenance-app`
+- Artifact store: `openspec` (autoritativo para esta ejecución); se intenta sincronizar Engram en `sdd/vehicle-maintenance-app/apply-progress`.
+- Modo: interactivo, TDD estricto activo (`npm test`); Strict TDD Mode confirmado por el orquestador.
+- Estrategia de entrega: `auto-chain`, `stacked-to-main`. Corte asignado: PR 3 completo y final (tareas 10–13), sin tocar la migración SQL ni `openspec/changes/archive/`.
+- Alcance ejecutado: esquemas Zod y server actions (tarea 10), pantallas mínimas de listado/alta/desactivación de vehículos (tarea 11), historial de eventos/registro de eventos/corrección de kilometraje/vencimientos (tarea 12), y verificación final del MVP (tarea 13).
+- Fuera de alcance, por instrucción explícita: auth/signup real, matriz de permisos aplicada, adjuntos, OCR, IA, notificaciones, dashboard avanzado, y cualquier migración SQL nueva.
+
+### Decisión de arquitectura: composición de servidor para PR3
+
+El verify-report de PR2 dejó documentado que `OperacionesBootstrap` (siembra real
+contra Postgres/Supabase Admin API) sigue sin implementación real, y que PR3 debía
+"asumir que el contexto de hogar/sesión se resuelve vía `ProveedorIdentidad`, sin
+necesidad de resolver auth/signup real en este PR, reutilizando el patrón temporal
+de identidad ya establecido en PR1/PR2, ahora conectado a server actions reales de
+Next.js en vez de solo pruebas de caso de uso".
+
+Decisión tomada (`src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.ts`):
+
+- Las server actions/páginas de PR3 componen los repositorios Supabase REALES ya
+  construidos en PR2 (`RepositorioVehiculosSupabase`, `RepositorioEventosSupabase`,
+  `crearClienteSupabaseServidor`) para persistencia, porque son la implementación de
+  producción y el propósito completo de PR2 era tenerlos listos para PR3.
+- La identidad sigue usando el patrón temporal `ProveedorIdentidadTemporal`
+  (PR1/PR2), NO `ProveedorIdentidadSupabaseServidor`: este último exige conocer de
+  antemano el `householdId` real sembrado por bootstrap, y resolver ese bootstrap
+  real está fuera de alcance de PR3 (ya diferido explícitamente en PR2/tarea 9).
+- Hallazgo técnico que obligó a un ajuste pequeño de PR2: `mv_households.id` y
+  `mv_vehiculos.household_id` son columnas `uuid` reales (verificado leyendo
+  `supabase/migrations/20260710000000_supabase_persistence_short.sql`). El valor
+  fijo previo `'hogar-desarrollo'` (texto arbitrario) de `ProveedorIdentidadTemporal`
+  NO sería un UUID válido contra el esquema real. Por eso se añadió la variable de
+  entorno obligatoria `SUPABASE_HOUSEHOLD_ID_DESARROLLO` (con su propio ciclo
+  RED→GREEN en `entorno.test.ts`/`entorno.ts`): debe contener el UUID real de
+  `mv_households.id` ya sembrado fuera de banda por un operador, una vez exista
+  entorno Supabase real. Esto está documentado en `supabase/migrations/README.md`
+  (nueva sección "PR3 — composición de servidor y `SUPABASE_HOUSEHOLD_ID_DESARROLLO`").
+- Consecuencia honesta: sin entorno Supabase real disponible en esta sesión (mismo
+  blocker de infraestructura ya documentado en PR2), esta composición no se ha
+  ejecutado de extremo a extremo contra una base real. Se valida con un doble
+  determinista de `crearClienteSupabaseServidor` (`dependencias-servidor.test.ts`,
+  1 mock, dentro del límite de higiene de mocks), igual que el resto de adaptadores
+  de PR2.
+
+### Tareas completadas y checkboxes persistidos
+
+Sección 10 (validación y server actions):
+- [x] RED/GREEN: `esquemas-vehiculo.test.ts`/`esquemas-vehiculo.ts` (5/5) y
+  `esquemas-evento.test.ts`/`esquemas-evento.ts` (5/5) con Zod: campos obligatorios,
+  coste opcional/no negativo, próximos vencimientos opcionales (incluye limpieza de
+  `''` de un `<input>` vacío a `undefined` antes de validar tipo).
+- [x] GREEN: `acciones-vehiculos.ts` y `acciones-eventos.ts` implementan server
+  actions reales (`'use server'`) que componen `crearDependenciasVehiculos()` y
+  llaman a los casos de uso de aplicación (nunca a Supabase directamente desde la
+  action). Cada action expone además una función `procesar*` testeable por
+  separado (sin depender de `next/cache`/`next/navigation`), que es la que tiene
+  ciclo RED→GREEN real con dependencias en memoria.
+- [x] GREEN: errores de dominio (`ErrorDominio`, p. ej. matrícula duplicada o
+  vehículo inexistente) se devuelven literalmente; cualquier otro error se
+  reemplaza por un mensaje genérico (`resultado-accion.ts`, `mensajeDeErrorAccion`,
+  2/2) para no filtrar detalles internos de infraestructura a la interfaz.
+- [x] REFACTOR: no se añadió ninguna API REST interna; las páginas consumen
+  directamente los casos de uso (Server Components) o las server actions (formularios).
+
+Sección 11 (pantallas mínimas de vehículos):
+- [x] RED/GREEN: no hay React Testing Library en el setup (`vitest.config.ts` usa
+  `environment: 'node'`; no hay `@testing-library/react` ni jsdom instalados). Se
+  siguió la salvedad explícita de la propia tarea 11 ("si no, registrar
+  verificación manual reproducible"): la lógica extraíble a función pura
+  (`aVehiculoVista`, 2/2 en `vehiculo-vista.test.ts`) sí tiene ciclo RED→GREEN real;
+  el resto (JSX/render) se cubre con el checklist de verificación manual de más
+  abajo, no con tests automatizados.
+- [x] GREEN: `src/app/vehiculos/page.tsx` (listado, Server Component,
+  `dynamic = 'force-dynamic'` para no intentar prerenderizar en build sin entorno
+  Supabase), `src/app/vehiculos/nuevo/page.tsx`, `formulario-vehiculo.tsx` (cliente,
+  `useActionState`) y `lista-vehiculos.tsx` (presentacional).
+- [x] GREEN: la lista muestra matrícula, marca+modelo, kilometraje formateado y una
+  etiqueta de estado (`data-estado="activo|inactivo"`) que distingue activos/inactivos.
+- [x] GREEN: alta desde `FormularioVehiculo` (`accionRegistrarVehiculo`, redirige a
+  `/vehiculos` en éxito) y desactivación lógica inline desde `ListaVehiculos`
+  (formulario con `accionDesactivarVehiculo`, solo visible en vehículos activos).
+- [x] REFACTOR: los tres componentes React son presentacionales/delgados; toda la
+  lógica de negocio vive en casos de uso/`procesar*`, no en JSX.
+
+Sección 12 (historial, eventos, corrección de kilometraje y vencimientos):
+- [x] RED/GREEN: se añadieron dos casos de uso nuevos y pequeños, cada uno con su
+  propio ciclo RED→GREEN, necesarios para la página de detalle:
+  `obtener-vehiculo.ts`/`.test.ts` (2/2: encontrado vs. no encontrado/aislado por
+  hogar) y `listar-eventos-vehiculo.ts`/`.test.ts` (2/2: eventos del hogar actual
+  vs. aislamiento de otro hogar). Los flujos de negocio en sí (mantenimiento,
+  avería, evento con km mayor, evento histórico, corrección manual, vencimiento por
+  km/fecha) ya estaban cubiertos por PR1/PR2 (`vehiculos-casos-uso.test.ts`,
+  `registrar-evento-vehiculo.test.ts`, `dominio/vencimiento.test.ts`) y se
+  reejercitan de extremo a extremo a través de `acciones-eventos.test.ts` (5/5:
+  registrar evento actualiza kilometraje, alta incompleta, vehículo inexistente,
+  corrección hacia abajo, kilometraje negativo rechazado).
+- [x] GREEN: nueva proyección pura `aEventoVista`/`evento-vista.ts` (3/3: vencido
+  por km, pendiente, sin vencimiento) que envuelve `evaluarVencimiento` (dominio,
+  PR1) para la interfaz sin persistir el estado derivado.
+- [x] GREEN: implementados `src/app/vehiculos/[vehiculoId]/page.tsx` (detalle,
+  Server Component; `notFound()` si el vehículo no existe/no pertenece al hogar),
+  `src/app/vehiculos/[vehiculoId]/eventos/nuevo/page.tsx`, `formulario-evento.tsx`
+  (cliente, `useActionState`) y `historial-eventos.tsx` (presentacional).
+- [x] GREEN: el histórico se lista para vehículos activos e inactivos por igual (el
+  caso de uso `listarEventosVehiculo` no filtra por `estado` del vehículo, solo por
+  `householdId`+`vehiculoId`, igual que en PR1/PR2).
+- [x] GREEN: `FormularioEvento` permite mantenimiento/avería con proveedor, coste,
+  notas y próximos vencimientos por km/fecha, todos opcionales salvo tipo/descripción/kilometraje/fecha.
+- [x] GREEN: se añadió `formulario-correccion-kilometraje.tsx` (cliente,
+  `useActionState` sobre `accionCorregirKilometraje`) embebido en la página de
+  detalle; acepta corrección hacia arriba o hacia abajo (el dominio ya lo permite
+  desde PR1, esta pantalla solo expone esa capacidad).
+- [x] GREEN: `HistorialEventos` muestra una etiqueta de vencimiento
+  (`data-estado-vencimiento`) solo cuando el evento tiene algún próximo
+  vencimiento; el estado (`pendiente`/`vencido`) se calcula en cada render vía
+  `aEventoVista`, nunca se guarda en Supabase.
+- [x] REFACTOR: no se implementó dashboard, gráficas ni resumen agregado; solo
+  listado + detalle + formularios mínimos, consistente con el límite explícito de
+  `diseno.md` §12.
+
+Sección 13 (verificación final del MVP): ver checklist con evidencia en
+`tasks.md` sección 13 (las 8 líneas quedaron marcadas `[x]` con la evidencia
+puntual de cada una).
+
+### TDD Cycle Evidence
+
+| Task | Test File | Layer | Safety Net | RED | GREEN | TRIANGULATE | REFACTOR |
+|------|-----------|-------|------------|-----|-------|-------------|----------|
+| Entorno: `SUPABASE_HOUSEHOLD_ID_DESARROLLO` | `compartido/infraestructura/entorno.test.ts` | Unit | ✅ 3/3 antes de modificar | ✅ 2 tests fallaron: `householdIdDesarrollo` ausente del objeto devuelto y falta de error al omitir la variable | ✅ 4/4 tras añadir la variable obligatoria | ➖ Un solo caso relevante (mismo patrón que las otras 4 variables ya existentes) | ➖ Sin refactor necesario |
+| `ProveedorFechaSistema` | `adaptadores/sistema/proveedor-fecha-sistema.test.ts` | Unit (fake timers) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 2/2 tras implementar `ahora()` delegando en `new Date()` | ✅ Fecha fija vs. avance real del reloj entre llamadas | ➖ Sin refactor necesario, clase de una línea |
+| `crearDependenciasVehiculos` | `interfaz/composicion/dependencias-servidor.test.ts` | Unit/contract (cliente Supabase falso vía `vi.mock`) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 4/4 tras implementar la composición | ✅ Repositorios Supabase reales, misma instancia repo-eventos/UoW, contexto de identidad con householdId real del entorno, proveedor de fecha real | ➖ Sin refactor necesario |
+| `obtenerVehiculo` | `aplicacion/casos-uso/obtener-vehiculo.test.ts` | Application (repositorio en memoria) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 2/2 tras implementar el caso de uso | ✅ Encontrado en el hogar propio vs. no encontrado desde otro hogar | ➖ Sin refactor necesario, replica el patrón de `desactivar-vehiculo.ts` |
+| `listarEventosVehiculo` | `aplicacion/casos-uso/listar-eventos-vehiculo.test.ts` | Application (repositorio en memoria) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 2/2 tras implementar el caso de uso | ✅ Eventos del hogar propio vs. aislamiento de otro hogar con el mismo `vehiculoId` | ➖ Sin refactor necesario |
+| `esquemaRegistrarVehiculo`/`esquemaCorregirKilometraje` | `interfaz/validacion/esquemas-vehiculo.test.ts` | Unit (Zod) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 5/5 tras implementar ambos esquemas | ✅ Datos válidos con coerción de tipos, matrícula faltante, kilometraje negativo (vehículo y corrección) | ➖ Sin refactor necesario |
+| `esquemaRegistrarEvento` | `interfaz/validacion/esquemas-evento.test.ts` | Unit (Zod) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 5/5 tras implementar el esquema con preprocesado de campos opcionales vacíos | ✅ Coste/vencimientos presentes vs. vacíos (`''`→`undefined`) vs. coste negativo vs. tipo desconocido | ➖ Sin refactor necesario |
+| `mensajeDeErrorAccion` | `interfaz/acciones/resultado-accion.test.ts` | Unit (función pura) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente (se detectó y corrigió una violación accidental de la regla RED-primero: se había escrito la implementación antes que el test; se eliminó el archivo de producción, se confirmó el fallo real por módulo inexistente, y luego se reimplementó) | ✅ 2/2 tras reimplementar | ✅ Error de dominio (mensaje literal) vs. error genérico (mensaje reemplazado) | ➖ Sin refactor necesario |
+| `procesarRegistrarVehiculo`/`procesarDesactivarVehiculo` | `interfaz/acciones/acciones-vehiculos.test.ts` | Application/interfaz (repositorio en memoria + identidad temporal) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 5/5 tras implementar ambas funciones + envoltorios `'use server'` | ✅ Alta válida, alta incompleta (errores por campo), matrícula duplicada, desactivación exitosa, vehículo inexistente | ➖ Sin refactor necesario |
+| `procesarRegistrarEvento`/`procesarCorregirKilometraje` | `interfaz/acciones/acciones-eventos.test.ts` | Application/interfaz (repositorio en memoria) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 5/5 tras implementar ambas funciones + envoltorios `'use server'` | ✅ Evento válido actualiza kilometraje, descripción faltante, vehículo inexistente, corrección hacia abajo, kilometraje negativo rechazado | ➖ Sin refactor necesario |
+| `aVehiculoVista` | `interfaz/vistas/vehiculo-vista.test.ts` | Unit (función pura) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 2/2 tras implementar la proyección | ✅ Vehículo activo (sin fecha de desactivación) vs. inactivo (con fecha) | ➖ Sin refactor necesario |
+| `aEventoVista` | `interfaz/vistas/evento-vista.test.ts` | Unit (función pura, envuelve `evaluarVencimiento` de dominio) | N/A (módulo nuevo) | ✅ Falló: módulo inexistente | ✅ 3/3 tras implementar la proyección | ✅ Vencido por km, pendiente, sin vencimiento | ➖ Sin refactor necesario |
+
+### Test Summary
+
+- **Total tests nuevos en este PR3**: 37 (4 tests nuevos en `entorno.test.ts`
+  ampliado a 4 totales; 33 tests en 11 archivos de test completamente nuevos).
+- **Total tests passing (suite completa)**: 158/158 (`npm test`), 28 archivos.
+- **Layers usadas**: Unit puro (Zod, proyecciones de vista, `ProveedorFechaSistema`,
+  `mensajeDeErrorAccion`), Application con repositorios en memoria (casos de uso
+  nuevos y server actions `procesar*`), Unit/contract con doble del cliente
+  Supabase (composición de servidor). Ninguna capa de integración/E2E ni React
+  Testing Library disponible en este proyecto.
+- **Approval tests**: 0.
+- **Pure functions creadas**: `aVehiculoVista`, `aEventoVista`,
+  `mensajeDeErrorAccion`, `ProveedorFechaSistema.ahora` (delegada, no pura en
+  sentido estricto pero determinista respecto al reloj del sistema).
+- **Nota de honestidad TDD**: durante la implementación de `resultado-accion.ts` se
+  escribió por error la implementación antes que el test (violación del RED-primero
+  estricto). Se detectó de inmediato, se eliminó el archivo de producción, se
+  confirmó un RED genuino (fallo por módulo inexistente) y se reimplementó desde
+  ahí. Se documenta explícitamente en vez de ocultarlo.
+
+### Comandos ejecutados (resumen)
+
+- `npm test` (safety net inicial, antes de tocar nada): 17 archivos, 120 tests.
+- `npm install zod@4` → añadida como dependencia de producción (`zod@^4.4.3`).
+- Tras cada RED: `npx vitest run <archivo>` confirmando fallo real (módulo
+  inexistente o aserción no cumplida).
+- Tras cada GREEN/TRIANGULATE: `npx vitest run <archivo>` confirmando verde.
+- `npm test` (suite completa, verificado repetidamente durante el corte): 28
+  archivos, 158 tests, siempre en verde al cierre de cada tarea.
+- `npm run build` (verificado repetidamente durante el corte): verde con Next.js
+  16.2.10 y TypeScript sin errores; rutas nuevas confirmadas en la salida
+  (`/vehiculos` y `/vehiculos/[vehiculoId]` como `ƒ` dinámicas por
+  `dynamic = 'force-dynamic'`; `/vehiculos/nuevo` y
+  `/vehiculos/[vehiculoId]/eventos/nuevo` como estáticas, sin fetch de datos en el
+  Server Component).
+- `npx vitest run src/modulos/vehiculos/adaptadores/supabase/seguridad-servidor.test.ts`
+  → 7/7 tras añadir los 3 componentes cliente nuevos (barre todo `src/`, confirma
+  que ninguno importa `adaptadores/supabase`).
+- `rg` manual: sin `service_role`/`NEXT_PUBLIC_` en `src/`; sin imports de
+  Next.js/React/Supabase/Zod/Tailwind ni referencias a `householdId` en
+  `dominio/`.
+- `npm audit --json` final: 2 vulnerabilidades moderadas (mismas ya documentadas en
+  PR2: `postcss`/`next` vía `postcss` transitivo); ninguna vulnerabilidad nueva
+  introducida por `zod`.
+
+### Archivos cambiados
+
+Modificados:
+- `src/compartido/infraestructura/entorno.ts` (nueva variable obligatoria `householdIdDesarrollo`)
+- `src/compartido/infraestructura/entorno.test.ts`
+- `supabase/migrations/README.md` (nueva sección "PR3 — composición de servidor y `SUPABASE_HOUSEHOLD_ID_DESARROLLO`")
+- `package.json`, `package-lock.json` (añadido `zod@^4.4.3`)
+- `openspec/changes/vehicle-maintenance-app/tasks.md` (secciones 10–13 marcadas `[x]`)
+- `openspec/changes/vehicle-maintenance-app/apply-progress.md`
+
+Creados — aplicación:
+- `src/modulos/vehiculos/aplicacion/casos-uso/obtener-vehiculo.ts` y `.test.ts`
+- `src/modulos/vehiculos/aplicacion/casos-uso/listar-eventos-vehiculo.ts` y `.test.ts`
+
+Creados — adaptadores:
+- `src/modulos/vehiculos/adaptadores/sistema/proveedor-fecha-sistema.ts` y `.test.ts`
+
+Creados — interfaz (composición/validación/acciones/vistas):
+- `src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.ts` y `.test.ts`
+- `src/modulos/vehiculos/interfaz/validacion/esquemas-vehiculo.ts` y `.test.ts`
+- `src/modulos/vehiculos/interfaz/validacion/esquemas-evento.ts` y `.test.ts`
+- `src/modulos/vehiculos/interfaz/acciones/resultado-accion.ts` y `.test.ts`
+- `src/modulos/vehiculos/interfaz/acciones/acciones-vehiculos.ts` y `.test.ts`
+- `src/modulos/vehiculos/interfaz/acciones/acciones-eventos.ts` y `.test.ts`
+- `src/modulos/vehiculos/interfaz/vistas/vehiculo-vista.ts` y `.test.ts`
+- `src/modulos/vehiculos/interfaz/vistas/evento-vista.ts` y `.test.ts`
+
+Creados — interfaz (componentes React, sin test automatizado, ver checklist manual):
+- `src/modulos/vehiculos/interfaz/componentes/lista-vehiculos.tsx`
+- `src/modulos/vehiculos/interfaz/componentes/formulario-vehiculo.tsx`
+- `src/modulos/vehiculos/interfaz/componentes/formulario-evento.tsx`
+- `src/modulos/vehiculos/interfaz/componentes/historial-eventos.tsx`
+- `src/modulos/vehiculos/interfaz/componentes/formulario-correccion-kilometraje.tsx`
+
+Creados — páginas Next.js (App Router, sin test automatizado, ver checklist manual):
+- `src/app/vehiculos/page.tsx`
+- `src/app/vehiculos/nuevo/page.tsx`
+- `src/app/vehiculos/[vehiculoId]/page.tsx`
+- `src/app/vehiculos/[vehiculoId]/eventos/nuevo/page.tsx`
+
+### Checklist de verificación manual reproducible (pantallas React/páginas)
+
+No ejecutada de extremo a extremo en esta sesión por falta de entorno Supabase real
+(mismo blocker de infraestructura documentado en PR2: sin `SUPABASE_URL` real, sin
+bootstrap ejecutado, sin `SUPABASE_HOUSEHOLD_ID_DESARROLLO` real). Reproducible por
+un operador con `npm run dev` y variables de entorno reales configuradas:
+
+1. Abrir `/vehiculos` sin vehículos registrados → se ve el mensaje de estado vacío
+   ("Todavía no hay vehículos registrados.").
+2. Ir a `/vehiculos/nuevo`, enviar el formulario con la matrícula vacía → el
+   formulario permanece en la misma página y muestra el mensaje de error más el
+   error específico bajo el campo matrícula (alta incompleta rechazada).
+3. Enviar el formulario completo y válido → redirige a `/vehiculos` y el vehículo
+   nuevo aparece en la lista con matrícula, marca+modelo, kilometraje formateado y
+   la etiqueta "Activo".
+4. Repetir el alta con la misma matrícula → error "Ya existe un vehículo con esa
+   matrícula." (mensaje de dominio, comprensible).
+5. Click en el vehículo de la lista → navega a `/vehiculos/[id]`, se ve
+   marca/modelo/año/combustible/estado, el formulario de corrección de kilometraje
+   y la sección de histórico vacía con enlace "Añadir evento".
+6. Corregir el kilometraje a un valor mayor y luego a uno menor → tras cada envío
+   la página se revalida y el número mostrado junto al formulario cambia
+   correctamente en ambos sentidos.
+7. Ir a "Añadir evento", registrar un mantenimiento con kilometraje mayor al actual,
+   coste y ambos próximos vencimientos → redirige al detalle, el evento aparece en
+   el histórico con su vencimiento etiquetado ("Pendiente" o "Vencido" según los
+   valores usados) y el kilometraje del vehículo en la sección de arriba se
+   actualiza al del evento.
+8. Registrar un segundo evento "histórico" (kilometraje menor al actual del
+   vehículo) → el kilometraje del vehículo NO cambia, pero el evento igual aparece
+   en el histórico con su propio kilometraje (menor).
+9. Desde `/vehiculos`, desactivar el vehículo → la etiqueta cambia a "Inactivo", el
+   botón "Desactivar" desaparece para ese vehículo, y su detalle/histórico siguen
+   siendo accesibles (no se pierde el histórico).
+10. Revisar el mismo recorrido en una ventana estrecha (móvil) usando el modo
+    responsive del navegador → el contenido no se desborda horizontalmente y sigue
+    siendo legible (verifica el requisito no funcional "uso desde ordenador y
+    móvil" sin exigir un diseño responsive elaborado, consistente con el alcance
+    MVP).
+
+### Desviaciones del diseño
+
+- **`SUPABASE_HOUSEHOLD_ID_DESARROLLO` (nueva variable de entorno obligatoria)**:
+  no estaba en el listado original de variables de PR2 (`entorno.ts`). Necesaria
+  porque `ProveedorIdentidadTemporal` (identidad temporal ya establecida) debe
+  producir un `householdId` que sea un UUID válido contra `mv_households.id`
+  (columna `uuid` real), no un texto arbitrario. Documentada en
+  `supabase/migrations/README.md` y con su propio ciclo RED→GREEN en
+  `entorno.test.ts`.
+- **`obtenerVehiculo` y `listarEventosVehiculo` (dos casos de uso nuevos, no
+  listados literalmente en `diseno.md` §3/§5)**: necesarios para que la página de
+  detalle pueda leer un único vehículo y sus eventos sin que la interfaz llame
+  directamente a los repositorios (rompería la frontera de aplicación). Ambos
+  siguen exactamente el mismo patrón que los cinco casos de uso ya existentes
+  (`ProveedorIdentidad` + repositorio scoped por hogar).
+- **`ProveedorFechaSistema` (nuevo adaptador `adaptadores/sistema/`)**: implementación
+  real y trivial de `ProveedorFecha` para la composición de servidor; los casos de
+  uso ya dependían del puerto desde PR1, solo faltaba una implementación no-fake.
+- **Server actions con firma `(estadoPrevio, formData)` en vez de `(formData)`
+  simple**: se adoptó el patrón `useActionState` de React 19 para poder mostrar
+  errores de validación/dominio en el propio formulario sin JavaScript adicional
+  en el cliente más allá del hook. `accionDesactivarVehiculo` es la única acción
+  que se mantuvo con la firma simple `(formData) => Promise<void>` porque no
+  necesita mostrar estado de error en la UI (es un botón de una sola acción dentro
+  de la lista, no un formulario con campos).
+- **No se creó ningún archivo `.test.tsx`** para páginas/componentes React: el
+  proyecto no tiene React Testing Library ni entorno `jsdom` instalado
+  (`vitest.config.ts` usa `environment: 'node'`). Instalar y configurar RTL habría
+  sido un cambio de infraestructura de pruebas fuera del alcance declarado de PR3
+  (tareas 10–13, interfaz + server actions), así que se siguió la salvedad
+  explícita de la propia tarea 11 ("si no [hay RTL], registrar verificación manual
+  reproducible"), documentada arriba. Toda la lógica extraíble a funciones puras
+  (proyecciones de vista, validación, `procesar*` de server actions) sí tiene
+  cobertura automatizada real.
+- **Violación momentánea y corregida de RED-primero** en `resultado-accion.ts` (ver
+  nota de honestidad TDD arriba): documentada explícitamente, no oculta.
+
+### Riesgos / notas
+
+- La composición de servidor (`dependencias-servidor.ts`) no se ha ejecutado nunca
+  contra un Supabase real en esta sesión ni en las anteriores (mismo blocker de
+  infraestructura de PR2). Antes de un despliegue real hace falta: (a) un entorno
+  Supabase disponible, (b) ejecutar el bootstrap de PR2 (`sembrarHogarDeDesarrollo`,
+  todavía con `OperacionesBootstrap` como puerto sin implementación real — tarea 9
+  restante, no de este PR), y (c) configurar `SUPABASE_HOUSEHOLD_ID_DESARROLLO` con
+  el UUID real resultante.
+- El checklist de verificación manual de la sección anterior queda como
+  procedimiento reproducible, no como evidencia de ejecución real en este corte.
+- `npm audit` sigue reportando las mismas 2 vulnerabilidades moderadas de
+  `postcss`/`next` ya documentadas en cortes anteriores; `zod` no introduce
+  vulnerabilidades nuevas.
+- Las líneas nuevas de este corte (PR3 completo, tareas 10–13) superan ampliamente
+  el presupuesto de revisión de 400 líneas (~1.516 líneas en archivos nuevos más
+  ~50 líneas de modificaciones en archivos existentes), igual que ocurrió en PR2.
+  Esto es consistente con la Review Workload Forecast de `tasks.md`, que ya
+  anticipó un riesgo alto y resolvió `auto-chain`/`stacked-to-main` con PR3 como el
+  corte final, autónomo y verificable (no se subdivide más, siguiendo la
+  instrucción explícita de ejecutar "solo el corte asignado por PR", en este caso
+  el último).
+
+### Workload / PR boundary
+
+- PR boundary de este corte: PR 3 completo y final (tareas 10, 11, 12 y 13), sin
+  tocar la migración SQL ni `openspec/changes/archive/`.
+- Estrategia: `auto-chain`, `stacked-to-main`.
+- No se hizo commit ni se abrió PR (pendiente de confirmación explícita del
+  usuario/orquestador).
+- Verificación de cierre: `npm test` → 28 archivos, 158 tests, todos en verde.
+  `npm run build` → verde con Next.js 16.2.10, rutas nuevas de `/vehiculos`
+  confirmadas en la salida del build.
+
+## Remediación 4R (risk/resilience/readability/reliability) sobre PR3 — 2026-07-11
+
+### Contexto
+
+Revisión de 4 lentes (risk/resilience/readability/reliability) del diff de PR3
+(interfaz Next.js + server actions sobre el adaptador Supabase de PR2), con 8
+hallazgos confirmados (1 BLOCKER, 1 CRITICAL, 6 WARNING). TDD estricto activo
+(`npm test`); se siguió `strict-tdd.md` incluida su regla de degradación de capa
+de test ("Choosing Test Layer": Component rendering → Integration si hay
+herramientas, si no → Unit test con mocks, NUNCA saltar la tarea).
+
+### Fix 5 (WARNING, regresión confirmada) — fixture de PR2 rota por el nuevo campo de PR3
+
+- `cliente-supabase-servidor.test.ts` construía un `EntornoSupabase` sin el campo
+  `householdIdDesarrollo` (añadido por PR3), lo que hacía fallar `npx tsc --noEmit`
+  con `TS2741` en la línea 14, aunque `vitest run` no lo detectaba (sin chequeo de
+  tipos en runtime).
+- Fix: se añadió `householdIdDesarrollo: '11111111-1111-4111-8111-111111111111'` al
+  fixture. Confirmado con `npx tsc --noEmit`: 8 → 7 errores, exactamente el error
+  objetivo desaparecido; los otros 3 errores pre-existentes (`TS2556` en el mismo
+  archivo, `TS2540` en `bootstrap-servidor.test.ts`, `NODE_ENV` en
+  `validate-supabase-rls.test.ts`) quedaron intactos, fuera de alcance por
+  instrucción explícita.
+
+### Fix 1 (BLOCKER) — capa de interfaz sin pruebas automatizadas; el fallback de checklist manual nunca se ejecutó
+
+La nota "No se creó ningún archivo `.test.tsx`... se siguió la salvedad explícita
+de la propia tarea 11" del corte de PR3 (más arriba en este mismo documento) fue
+un hallazgo BLOCKER de esta revisión: la salvedad de degradar de capa de test es
+obligatoria (nunca saltar la tarea), no una excepción para omitirla.
+
+- Se instalaron `@testing-library/react@16.3.2` y `jsdom@29.1.1` como
+  devDependencies. **No** se cambió el `environment` global de `vitest.config.ts`
+  (sigue en `'node'` para no penalizar la velocidad de los tests no-DOM
+  existentes): cada archivo de test de componente usa el pragma por archivo
+  `// @vitest-environment jsdom`.
+- Se escribieron tests RED→GREEN reales (mockeando las server actions vía
+  `vi.mock` de sus módulos) para los 5 componentes presentacionales:
+  - `lista-vehiculos.test.tsx` (4 tests): estado vacío, fila por vehículo con
+    matrícula/marca/modelo/estado, botón "Desactivar" solo en activos, y el
+    mensaje de fallo de la server action ahora visible (ver Fix 3).
+  - `formulario-vehiculo.test.tsx` (3 tests): campos obligatorios renderizados,
+    invocación de la server action al enviar, mensaje de error + error por campo
+    cuando la acción falla.
+  - `formulario-evento.test.tsx` (3 tests): campos + `vehiculoId` oculto,
+    invocación de la acción al enviar, error + error por campo en fallo.
+  - `formulario-correccion-kilometraje.test.tsx` (3 tests): campo con el
+    kilometraje actual en la etiqueta, invocación de la acción, mensaje de error.
+  - `historial-eventos.test.tsx` (5 tests): estado vacío, evento con
+    tipo/descripción/km, ausencia de insignia sin vencimiento, insignia "Vencido"
+    e insignia "Pendiente" según `estadoVencimiento` de la vista.
+- Los dos envoltorios de server action sin test (`accionRegistrarVehiculo`,
+  `accionDesactivarVehiculo`) se cubrieron en `acciones-vehiculos.test.ts`
+  mockeando `next/navigation` (`redirect`), `next/cache` (`revalidatePath`) y el
+  módulo de composición de dependencias: se probó el parseo de `FormData`, que se
+  invoca el `procesar*` correspondiente, y que `redirect` solo se dispara cuando
+  `accionRegistrarVehiculo` tiene éxito (no en fallo de validación).
+- **Explícitamente NO se escribieron tests de Server Component async a nivel de
+  página** (`page.tsx`): requerirían mockear en profundidad todo el árbol de
+  `crearDependenciasVehiculos` → cliente Supabase real, y no hay un renderer de
+  RSC async soportado oficialmente en esta combinación de Vitest/RTL sin
+  infraestructura adicional (p. ej. un test runner de Next.js dedicado). Se
+  consideró desproporcionado frente al resto del alcance de este pase; los 5
+  componentes + los 2 envoltorios de acción (el núcleo real del hallazgo BLOCKER)
+  sí están cubiertos.
+
+### Fix 2 (CRITICAL) + Fix 6 (WARNING) — logging de incidentes y boilerplate duplicado (resueltos juntos)
+
+- `mensajeDeErrorAccion` convertía cualquier error no-`ErrorDominio` (incluyendo
+  `ErrorAdaptadorSupabase` con código Postgres real) en un mensaje genérico sin
+  ningún logging de servidor.
+- Se extrajo `ejecutarComoResultado<T>(contexto, fn)` en `resultado-accion.ts`:
+  centraliza el try/catch → `ResultadoAccion` que se repetía en las cuatro
+  funciones `procesar*` (`acciones-vehiculos.ts`, `acciones-eventos.ts`) y añade
+  `console.error` (contexto + `codigo`/mensaje si es `ErrorAdaptadorSupabase`, o
+  el error crudo si no) ANTES de devolver el mensaje genérico — solo para errores
+  que no son `ErrorDominio` (los de dominio son esperados, no un incidente).
+  `mensajeDeErrorAccion` se mantuvo como función pura reutilizada internamente.
+- Tests en `resultado-accion.test.ts`: éxito devuelve `{exito: true, datos}`; un
+  error de infraestructura (`ErrorAdaptadorSupabase`) registra `console.error` una
+  vez con el contexto y el `codigo`; un `ErrorDominio` NO registra nada.
+- Las cuatro funciones `procesar*` ahora son una línea de delegación a
+  `ejecutarComoResultado` cada una.
+
+### Fix 3 (WARNING) — `accionDesactivarVehiculo` descartaba su resultado
+
+- `accionDesactivarVehiculo` tenía firma simple `(formData) => Promise<void>` y
+  descartaba el `ResultadoAccion` de `procesarDesactivarVehiculo`: un fallo (p.
+  ej. error de infraestructura) era invisible para la persona usuaria.
+- Fix: se cambió la firma al patrón `useActionState` ya usado en el resto de PR3:
+  `(estadoPrevio, formData) => Promise<ResultadoAccion<void>>`, devolviendo el
+  resultado real en vez de descartarlo.
+- `lista-vehiculos.tsx` pasó a ser `'use client'` y se extrajo el subcomponente
+  `BotonDesactivarVehiculo` (uno por fila, porque cada vehículo necesita su propio
+  estado de `useActionState`) que renderiza el mensaje de fallo con `role="alert"`
+  cuando la acción no tiene éxito.
+- Tests: `acciones-vehiculos.test.ts` prueba que el wrapper devuelve el fallo en
+  vez de descartarlo; `lista-vehiculos.test.tsx` prueba que ese fallo se
+  renderiza en la UI tras un click real (con `fireEvent` + `act`).
+
+### Fix 4 (WARNING) — sin frontera de error bajo `src/app`
+
+- Se añadió `src/app/vehiculos/error.tsx` (convención `error.tsx` de Next.js,
+  componente cliente con `error`/`reset`): mensaje mínimo de degradación + botón
+  "Reintentar" que llama a `reset()`.
+- Test en `error.test.tsx` (jsdom): renderiza el mensaje de degradación y que el
+  click en "Reintentar" invoca `reset`.
+
+### Fix 7 (WARNING) — ramas de vencimiento no cubiertas en `evento-vista.test.ts`
+
+- Se añadieron dos casos a los tres ya existentes: vencido disparado solo por
+  fecha (con km bajo el umbral, para que dependa de que `fechaActual` se
+  reenvíe correctamente a `evaluarVencimiento`), y pendiente cuando tanto el km
+  como la fecha están justo por debajo de sus umbrales respectivos (depende de
+  que ambos campos se reenvíen correctamente).
+- Sanity check manual: se rompió temporalmente el reenvío de `fechaActual` en
+  `aEventoVista` (hardcodeado a una fecha antigua) y se confirmó que el nuevo
+  test de "vencido por fecha" fallaba como se esperaba, antes de revertir el
+  cambio — descartando un GREEN trivial.
+
+### Fix 8 (WARNING) — `SUPABASE_HOUSEHOLD_ID_DESARROLLO` sin validar formato UUID
+
+- `crearIdentificador` (revisado primero, como pedía la instrucción) no hace
+  validación de formato UUID, solo no-vacío; se añadió un regex UUID dedicado en
+  `entorno.ts` (`requerirUuid`), aplicado únicamente a
+  `SUPABASE_HOUSEHOLD_ID_DESARROLLO` en `leerEntornoSupabase`, para fallar en
+  lectura de configuración con un mensaje claro en vez de un
+  "invalid input syntax for type uuid" de Postgres en la primera consulta real.
+- Test RED→GREEN en `entorno.test.ts`.
+
+### Fuera de alcance de este pase (confirmado, no tocado)
+
+- Los 3 errores de `tsc` pre-existentes no relacionados con Fix 5.
+- Asimetría de `revalidatePath` en `accionCorregirKilometraje` (cosmético).
+- Constantes de estilo Tailwind duplicadas entre formularios (cosmético).
+- Misclasificación silenciosa de `evaluarVencimiento` ante un `Date` inválido
+  (defensivo, sin ruta real de disparo dado que Zod ya valida antes).
+- Migración SQL y `openspec/changes/archive/`: no tocados.
+
+### Verificación de cierre
+
+- `npm test` → 34 archivos, 188 tests, todos en verde (antes del pase: 28
+  archivos, 158 tests).
+- `npx tsc --noEmit` → 7 errores (antes del pase: 8; exactamente el de Fix 5
+  desapareció, los 7 restantes son pre-existentes y fuera de alcance).
+- `npm run build` → verde con Next.js 16.2.10 Turbopack, mismas rutas de
+  `/vehiculos` confirmadas en la salida del build.
+
+## Remediación pre-commit PR3 — bloqueadores full-4R
+
+- `RISK-PR3-001`: la composición de servidor ahora falla cerrada antes de crear el cliente o resolver la identidad temporal. Exige `VEHICULOS_ACCESS_TOKEN` en servidor y una cabecera `x-vehiculos-access-token` idéntica, pensada para ser inyectada por el proxy de acceso del MVP. La comparación usa `timingSafeEqual`. Pruebas: prueba ausente e inválida bloquean; prueba válida permite componer dependencias.
+- `R3-PR3-001`: las fechas de eventos se formatean explícitamente en UTC. La regresión comprueba que `2026-02-01T00:00:00.000Z` se muestra como `1/2/2026`.
+- `R4-OBS-001`: se añadió `ReportadorIncidentes`, usado por errores de infraestructura de server actions y por la frontera de error de `/vehiculos`.
+- `R4-PR3-002`: producción dispone ahora de integración HTTP real mediante `NEXT_PUBLIC_INCIDENT_REPORT_URL`; alternativamente puede instalarse un SDK con `establecerReportadorIncidentes`. Sin configuración se degrada a consola sanitizada.
+- `R4-PR3-003`: los fallos síncronos y asíncronos del reportador quedan aislados y activan el fallback sin romper server actions ni la frontera de error.
+
+### Evidencia TDD y validación
+
+- RED final: 4 pruebas fallaron antes de la implementación (reportador sin duplicado, reportador que lanza, endpoint configurado y frontera resiliente).
+- GREEN/TRIANGULATE final: pruebas focalizadas 11/11; suite completa 196/196; server action conserva mensaje genérico y la frontera renderiza y ejecuta `reset` aunque falle el reportador.
+- Requisito operativo: configurar `NEXT_PUBLIC_INCIDENT_REPORT_URL` con un endpoint que acepte `POST` JSON o instalar un SDK. El payload excluye stack y valores de error no serializables.
+
+- RED focalizado: fallaron las pruebas de acceso ausente/inválido y faltaba el módulo `reporte-incidentes`.
+- GREEN/TRIANGULATE: `npm test -- src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.test.ts src/modulos/vehiculos/interfaz/componentes/historial-eventos.test.tsx src/modulos/vehiculos/interfaz/acciones/resultado-accion.test.ts src/app/vehiculos/error.test.tsx` → 4 archivos, 22 pruebas pasadas.
+- Suite: `npm test` → 34 archivos, 194 pruebas pasadas.
+- Tipos: `npx tsc --noEmit` → conserva exactamente los 7 errores preexistentes conocidos; no aparecen errores nuevos.
+- Build: `npm run build` → compilación y generación completadas correctamente.
+
+## Remediación final de fiabilidad PR3 — `R3-REL-001`
+
+- RED observado: `npm test -- src/modulos/vehiculos/interfaz/acciones/resultado-accion.test.ts` falló 2/10 pruebas porque el fallback escribía `token-secreto`, `Bearer secreto` y el mensaje con credenciales del error.
+- GREEN/TRIANGULATE: el fallback y el payload HTTP ahora usan una allowlist mínima (`codigo`; presencia de `digest` con valor redactado), omiten cualquier otra metadata y sustituyen `Error.message` por un texto neutro. Los rechazos asíncronos, incluidos thenables, se aíslan mediante `Promise.resolve(...).catch(...)` y activan el mismo fallback seguro sin propagarse al caller.
+- Pruebas focalizadas: `npm test -- src/modulos/vehiculos/interfaz/acciones/resultado-accion.test.ts src/app/vehiculos/error.test.tsx` → 2 archivos, 13/13 tests.
+- Suite completa: `npm test` → 34 archivos, 198/198 tests.
+- Tipos: `npx tsc --noEmit` → exactamente los 7 errores conocidos, ninguno en los archivos de esta remediación.
+
+## Remediación final de fiabilidad PR3 — `R3-001` y `R3-002`
+
+- `R3-001`: las pruebas de token ausente e inválido ahora limpian los mocks antes de cada caso y verifican explícitamente que `crearClienteSupabaseServidor` no fue llamado. Así queda protegido el orden validación → creación de dependencias.
+- `R3-002`: la regresión de fecha fuerza `TZ=America/Los_Angeles`, demuestra que el formateo local produciría `31/1/2026` y exige que el componente mantenga `1/2/2026`. La zona original se restaura en `finally`.
+- RED: excepción justificada para remediación test-only; la implementación ya era correcta y ambas nuevas aserciones pasaron en su primera ejecución. No se modificó producción.
+- GREEN/TRIANGULATE: `npm test -- src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.test.ts src/modulos/vehiculos/interfaz/componentes/historial-eventos.test.tsx` → 2 archivos, 13/13 tests.
+- Suite: `npm test` → 34 archivos, 198/198 tests.
+- Tipos: `npx tsc --noEmit` → código 2 con exactamente los 7 errores conocidos; cero errores nuevos.

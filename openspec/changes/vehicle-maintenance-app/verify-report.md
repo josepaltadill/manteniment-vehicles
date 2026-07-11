@@ -1,112 +1,159 @@
-# Verification Report — PR2
+# Reporte de verificación — PR3
 
-**Change**: vehicle-maintenance-app
-**Scope**: PR2 only (tasks 5–9 in `tasks.md`) — reopened PR1 ports/use-cases/`ProveedorIdentidad` for household scoping, Supabase mappers against existing schema, server-only Supabase adapter, atomic event+mileage contract, auth/RLS credential bootstrap. Includes remediation of a subsequent 4-lens adversarial review (2 CRITICAL, 3 WARNING) applied after the initial PR2 apply.
-**Mode**: Strict TDD
+**Cambio**: `vehicle-maintenance-app`
+**Corte verificado**: PR3 pre-commit, tareas 10–13 y remediación de bloqueadores full-4R
+**Modo**: TDD estricto (`npm test`)
+**Fecha**: 2026-07-11
 
-## Completeness
+## Veredicto
 
-| Metric | Value |
-|--------|-------|
-| PR2 tasks (section 5–9) total | 30 subtasks |
-| PR2 tasks complete | 29 |
-| PR2 tasks incomplete | 1 (task 9, real `OperacionesBootstrap` vs Postgres/Admin API + DB uniqueness guard — explicitly deferred, requires live Supabase env + new migration) |
-| PR1 (sections 1–4) | Unaffected; still `[x]`, not broken by PR2 changes |
-| PR3 (sections 10–13) | Correctly untouched — no files in `src/modulos/vehiculos/interfaz/` or `src/app/vehiculos/` exist |
+**PASS DEL CORTE PR3 CON BLOQUEADOR DE ARCHIVO Y ADVERTENCIAS**
 
-The single unchecked item (tasks.md line 130) is honestly represented: it is split out from the completed orchestration/interface task (line 129, `[x]`) and explicitly documents why it can't be completed in this session (no live Supabase environment, would need a new migration for a DB-level `unique` constraint on `mv_households.nombre`). This is correct and not a silent gap.
+El corte PR3 corregido está verde: 196/196 tests y 11/11 pruebas focalizadas finales de reporte de incidentes. `npx tsc --noEmit` conserva exactamente los 7 errores conocidos y no introduce errores nuevos. El build de producción final se repitió después de la última remediación y pasó correctamente.
 
-## Build & Tests Execution
+Los hallazgos `RISK-PR3-001`, `R3-PR3-001` y `R4-OBS-001` quedan remediados. Este reporte no declara listo para archivo el cambio OpenSpec completo porque persiste una tarea de implementación sin marcar.
 
-**Build**: ✅ Passed
+## Estado estructurado y actionContext
+
+- Proyecto: `manteniment-vehicles`.
+- Cambio activo: `vehicle-maintenance-app`; selección inequívoca.
+- Artifact store: `both`; OpenSpec fue la autoridad de esta ejecución.
+- Workspace: `/home/josep/proyectos/manteniment-vehicles`; propiedad del código probada mediante el working tree actual.
+- Corte autorizado: PR3, tareas 10–13 y lote de corrección full-4R.
+- Estrategia: `auto-chain`; chain strategy `stacked-to-main`.
+- Contexto: pre-commit con cambios ya staged. Solo se ejecutaron verificaciones y se actualizó este reporte.
+- No se hizo commit, push, archive ni se modificaron migraciones SQL.
+
+## Completitud de tareas
+
+- Tareas 10–13 de PR3: todas `[x]`.
+- Evidencia de remediación y tabla/secciones de `TDD Cycle Evidence`: presentes en `apply-progress.md`; los archivos de prueba declarados existen.
+- Única tarea de implementación sin marcar en `tasks.md`:
+
+> - [ ] GREEN (pendiente, fuera de este PR): implementar `OperacionesBootstrap` contra Postgres/Supabase Admin API real (no dobles) + añadir guardia de unicidad/bloqueo a nivel de base de datos (constraint `unique` en `mv_households.nombre` o mecanismo equivalente) antes de usar este bootstrap en un entorno multi-instancia o de producción. Requiere entorno Supabase real/local disponible y probablemente una nueva migración; no se puede completar en esta sesión (ver blockers en `apply-progress.md`).
+
+**CRITICAL de completitud/archivo**: esta tarea queda fuera del límite PR3 aprobado, pero impide un PASS limpio del cambio completo, su archivo y un despliegue real/multi-instancia.
+
+## Verificación de los bloqueadores full-4R
+
+| Hallazgo | Inspección independiente | Prueba | Resultado |
+|---|---|---|---|
+| `RISK-PR3-001` — acceso anónimo con identidad/hogar temporal | `crearDependenciasVehiculos` valida antes de crear el cliente una prueba request-bound: `VEHICULOS_ACCESS_TOKEN` frente a `x-vehiculos-access-token`; ausencia o desigualdad falla cerrada con `ErrorAccesoVehiculos`; comparación con `timingSafeEqual`. | Ausente e inválida rechazan; válida permite composición. | ✅ Remediado |
+| `R3-PR3-001` — fechas dependientes de zona horaria | `historial-eventos.tsx` usa `toLocaleDateString('es-ES', { timeZone: 'UTC' })`. | ISO `2026-02-01T00:00:00.000Z` se muestra como `1/2/2026`. | ✅ Remediado |
+| `R4-OBS-001` / `R4-PR3-002` — incidentes solo por consola | `ReportadorIncidentes` usa un SDK inyectado o el endpoint HTTP configurado por `NEXT_PUBLIC_INCIDENT_REPORT_URL`; server actions y `/vehiculos/error.tsx` reportan contexto sanitizado. | Tests verifican reportador inyectado, endpoint configurado y fallback sin configuración. | ✅ Remediado |
+| `R4-PR3-003` — fallo del reportador rompe la degradación | `reportarIncidente` captura fallos síncronos y rechazos asíncronos; la consola sanitizada se usa solo como fallback. | Server action conserva mensaje genérico; la frontera renderiza y `reset` funciona aunque el reportador lance. | ✅ Remediado |
+
+Nota operativa: el proxy/despliegue debe configurar e inyectar la cabecera de acceso; si no lo hace, la aplicación falla cerrada.
+
+## Cobertura de especificación del corte PR3
+
+| Área | Evidencia | Resultado |
+|---|---|---|
+| Validación de alta, eventos y corrección | Esquemas Zod y tests | ✅ |
+| Server actions y errores comprensibles | Tests `acciones-*` y `resultado-accion` | ✅ |
+| Listado, alta y desactivación | Vistas, acciones y tests de componentes | ✅ |
+| Historial, eventos y kilometraje | Casos de uso, acciones y componentes | ✅ |
+| Vencimientos calculados | Dominio, proyección y componente de historial | ✅ |
+| Frontera de error de `/vehiculos` | `error.tsx` y `error.test.tsx` | ✅ |
+| Aislamiento de acceso previo a composición | Prueba de token request-bound | ✅ |
+| Uso desktop/móvil contra Supabase real | No ejecutado por falta de entorno real | ⚠️ No verificado E2E |
+
+## Comandos ejecutados
+
+### Pruebas focalizadas de bloqueadores
+
+```bash
+npm test -- src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.test.ts src/modulos/vehiculos/interfaz/componentes/historial-eventos.test.tsx src/modulos/vehiculos/interfaz/acciones/resultado-accion.test.ts src/app/vehiculos/error.test.tsx
 ```
-npm run build
-▲ Next.js 16.2.10 (Turbopack)
-✓ Compiled successfully in 1056ms
-✓ TypeScript finished, no errors
-✓ Static pages generated (3/3)
-```
 
-**Tests**: ✅ 120 passed / ❌ 0 failed / ⚠️ 0 skipped
-```
+Resultado: ✅ 4 archivos, 22/22 tests.
+
+### Suite completa
+
+```bash
 npm test
-Test Files  17 passed (17)
-     Tests  120 passed (120)
 ```
-Matches the count claimed in `apply-progress.md` ("120/120 tests, 17 archivos") for the remediated state.
 
-**Coverage**: ➖ Not available (no coverage tool configured; `package.json` has no coverage script, no `vitest.config.ts` coverage block).
-**Linter**: ➖ Not available (no ESLint config found in repo root).
+Resultado final: ✅ 34 archivos, 196/196 tests.
 
-## Remediation Verification (5 items requested)
+### Type-check independiente
 
-| # | Item | Verified in code | Verified in tests |
-|---|------|-------------------|--------------------|
-| 1 | Bootstrap race detection: `ErrorRaceBootstrapHogar` thrown after re-query if >1 household with same name | ✅ `bootstrap-servidor.ts` L36–48, 83–93 — re-queries only after CREATE path (not the idempotent found-path), throws typed error | ✅ `bootstrap-servidor.test.ts` — dedicated test simulates `contarHogaresPorNombre` returning 2, asserts `ErrorRaceBootstrapHogar` instance + message; also idempotency test confirms count-check is NOT called on the found-path |
-| 1b | `tasks.md` §9 honesty split | ✅ Confirmed: line 129 `[x]` (orchestration/interface, tested against doubles) is distinct from line 130 `[ ]` (real Postgres/Admin-API impl + DB uniqueness constraint, explicitly deferred — needs live env + new migration) | N/A (doc check) |
-| 2 | Typed `ErrorAdaptadorSupabase` with `codigo`, used across 4 adapter files | ✅ `errores-adaptador.ts` defines class + `errorAdaptadorSupabaseDesde` helper; used in `repositorio-vehiculos-supabase.ts` (4 sites), `repositorio-eventos-supabase.ts` (5 sites incl. atomic point), `proveedor-identidad-supabase-servidor.ts` (1 site, membership read), `cliente-supabase-servidor.ts` (1 site, auth) — remaining `throw new Error(...)` in those files are app-state assertions, not raw Postgres errors, correctly left untouched | ✅ `errores-adaptador.test.ts` (2 tests: with/without code) + assertions in all 4 adapter test files checking `instanceof ErrorAdaptadorSupabase` and `.codigo` |
-| 2b | Structured `console.error` at atomicity-risk point | ✅ `repositorio-eventos-supabase.ts` L121–126 — logs `householdId`, `vehiculoId`, `codigo`, `mensaje` only at the real-risk point (event insert fails AFTER vehicle update committed); correctly NOT logged when vehicle update itself fails (no inconsistency exists yet at that point) | ✅ `repositorio-eventos-supabase.test.ts` covers both branches |
-| 3 | `Vehiculo` constructor rejects inconsistent `estado`/`fechaDesactivacion` | ✅ `vehiculo.ts` L137–152, `validarConsistenciaEstadoDesactivacion` called from the shared private constructor (applies to `crear`, `desactivar`, `corregirKilometraje`, `reconstruir`) | ✅ `vehiculo.test.ts` — 2 dedicated tests: activo+fecha and inactivo+no-fecha, both assert `ErrorDominio` |
-| 4 | `existeMatricula` no longer case-normalizes in in-memory double | ✅ `repositorio-vehiculos-en-memoria.ts` L23–31 — direct `===` comparison, comment explains parity with Supabase's `.eq()` and the DB's case-sensitive `unique(household_id, matricula)` | ✅ `rg` search across `src/` found zero lingering assertions of case-insensitive behavior; new test in `vehiculos-casos-uso.test.ts` L75 asserts the corrected behavior (same matricula, different case, IS allowed in same household) |
-| 5 | Events use `.insert()` not `.upsert()`; vehicles remain `.upsert()` | ✅ `repositorio-eventos-supabase.ts` L33 (`guardar`) and L111 (`registrarEventoYActualizarKilometraje`) both use `.insert()`; L93 (vehicle write) still uses `.upsert()` correctly | ✅ `repositorio-eventos-supabase.test.ts` L45–59, L108–112 explicitly assert `.insert()` present and `.upsert()` absent for event writes |
+```bash
+npx tsc --noEmit
+```
 
-All 5 remediation items are genuinely present, correctly scoped, and covered by passing tests — not just claimed in `apply-progress.md`.
+Resultado: ⚠️ código 2, exactamente 7 errores conocidos:
 
-## Spec Compliance Matrix (PR2-relevant only)
+```text
+src/compartido/pruebas/validate-supabase-rls.test.ts(93,35): error TS2741: Property 'NODE_ENV' is missing in type '{ MV_FAKE_PROJECT_ID: string; }' but required in type 'ProcessEnv'.
+src/compartido/pruebas/validate-supabase-rls.test.ts(132,11): error TS2741: Property 'NODE_ENV' is missing in type '{ [x: string]: string; }' but required in type 'ProcessEnv'.
+src/compartido/pruebas/validate-supabase-rls.test.ts(249,37): error TS2741: Property 'NODE_ENV' is missing in type '{ MV_FAKE_PROJECT_ID: string; }' but required in type 'ProcessEnv'.
+src/compartido/pruebas/validate-supabase-rls.test.ts(389,35): error TS2741: Property 'NODE_ENV' is missing in type '{ MV_FAKE_PROJECT_ID: string; }' but required in type 'ProcessEnv'.
+src/compartido/pruebas/validate-supabase-rls.test.ts(405,9): error TS2741: Property 'NODE_ENV' is missing in type '{ DATABASE_URL: string; MV_RLS_MUTATION_MARKER: string; }' but required in type 'ProcessEnv'.
+src/modulos/vehiculos/adaptadores/supabase/bootstrap-servidor.test.ts(77,17): error TS2540: Cannot assign to 'contarHogaresPorNombre' because it is a read-only property.
+src/modulos/vehiculos/adaptadores/supabase/cliente-supabase-servidor.test.ts(11,58): error TS2556: A spread argument must either have a tuple type or be passed to a rest parameter.
+```
 
-| Requirement | Scenario | Test | Result |
-|-------------|----------|------|--------|
-| Aislamiento por hogar (multi-tenant) | `buscarPorId`/`listar` no filtran entre hogares | `vehiculos-casos-uso.test.ts` (aislamiento) | ✅ COMPLIANT |
-| Matrícula única por hogar | Rechaza duplicado mismo hogar, permite en hogar distinto | `vehiculos-casos-uso.test.ts` | ✅ COMPLIANT |
-| Adaptar esquema Supabase existente, prefijo `mv_`, sin migración nueva | Mapeadores contra columnas reales | `mapeadores-supabase.test.ts` (21 asserts) | ✅ COMPLIANT |
-| Backend/server actions como frontera de datos; sin acceso browser-side | Ningún `'use client'` importa adaptadores Supabase | `seguridad-servidor.test.ts` (8 tests incl. barrido real del repo) | ✅ COMPLIANT |
-| Sin `service_role` en cliente | Detector de patrón de clave privilegiada | `seguridad-servidor.test.ts` | ✅ COMPLIANT |
-| Evento + kilometraje atómico/coordinado | Fallo del vehículo no confirma evento; histórico no actualiza km | `registrar-evento-vehiculo.test.ts`, `repositorio-eventos-supabase.test.ts` | ✅ COMPLIANT (app-level coordination, not a real SQL transaction — documented risk, in-scope per design decision) |
+No aparecen errores en los archivos de la remediación actual ni errores adicionales respecto de la base documentada.
 
-## Correctness (Static Evidence)
+### Build
 
-| Area | Status | Notes |
-|------|--------|-------|
-| No PR3/UI/server-action code added | ✅ Confirmed | `find src/modulos/vehiculos/interfaz` and `src/app/vehiculos` return nothing |
-| No migration file touched | ✅ Confirmed | `git status` shows `supabase/migrations/20260710000000_supabase_persistence_short.sql` untouched; only `supabase/migrations/README.md` (docs) modified |
-| No `service_role`/privileged credential client-reachable | ✅ Confirmed | Only `SUPABASE_ANON_KEY` used in `entorno.ts`; all `service_role` mentions are comments/docs/the security-guard test itself |
-| `entorno.ts` rejects `NEXT_PUBLIC_*` for app-data vars | ✅ Confirmed | L39-43 |
-| DB schema mapping accuracy | ✅ Confirmed | Compared `mapeadores-supabase.ts` field-by-field against `20260710000000_supabase_persistence_short.sql`; matches exactly (no `creado_en`, `fecha_creacion` used correctly, composite FK `(household_id, vehiculo_id)`) |
-| Assertion Quality Audit | ✅ Clean | No tautologies, no ghost loops, no ratio-imbalanced mock-heavy tests found across new/modified adapter and domain test files |
+```bash
+npm run build
+```
 
-## Coherence (Design)
+Resultado: ✅ Next.js 16.2.10 compiló, completó TypeScript interno, generó 4/4 páginas y publicó las rutas previstas de `/vehiculos`.
 
-| Decision | Followed? | Notes |
-|----------|-----------|-------|
-| §15.6 credential decision (real seeded `auth.users` + RLS, no `service_role`) | ✅ Yes | Implemented exactly as decided |
-| Atomic contract via app coordination (no RPC, since no new migration allowed) | ✅ Yes | Documented risk explicitly in code + apply-progress |
-| Dominio agnóstico al `householdId` | ✅ Yes | Confirmed via grep, no `householdId` references in `dominio/` |
+## Cumplimiento TDD estricto y calidad de aserciones
 
-## Issues Found
+- `apply-progress.md` contiene evidencia RED/GREEN para la remediación pre-commit.
+- Los cuatro archivos focalizados existen y GREEN sigue confirmado con 22/22; la suite completa pasa 194/194.
+- Las aserciones verifican rechazos y aceptación de acceso, fecha visible estable, llamadas al reportador inyectado, contexto, código Supabase y digest.
+- No se observaron tautologías, ghost loops, aserciones solo de tipos, smoke-only como única evidencia ni aserciones CSS de detalle de implementación.
+- Limitación: no existe prueba E2E contra Supabase/proxy reales ni recorrido real desktop/móvil.
 
-**CRITICAL**: None — both previously-identified CRITICAL issues (bootstrap race, typed errors) are confirmed remediated and tested.
+## Review Workload / límite de PR
 
-**WARNING**:
-- Real `OperacionesBootstrap` implementation against Postgres/Supabase Admin API, plus a DB-level uniqueness guard on `mv_households.nombre`, remains genuinely pending (tasks.md §9, unchecked `[ ]`). This is **not a PR2-completion blocker** (explicitly scoped as follow-up requiring a live Supabase environment and a new migration), but it **is a pre-real-deployment blocker**: without it, concurrent/multi-instance bootstrap runs could silently duplicate a household before the loud-failure detection catches it, and there is still no DB-level backstop.
-- `.env.example` could not be created in this session due to a sandbox restriction on writing `.env*` files; variable names are documented in `supabase/migrations/README.md` as mitigation, but a human operator still needs to create the real file before deployment.
+- El forecast exigía PRs encadenados; el trabajo permanece en el corte PR3 (tareas 10–13 y correcciones de revisión), sin implementar el bootstrap/Admin API pendiente ni crear/modificar migraciones SQL.
+- Chain strategy respetada: `stacked-to-main`.
+- El staged diff es grande: 48 archivos, 3636 inserciones y 109 eliminaciones. Aunque PR3 era el slice asignado, supera ampliamente 400 líneas. Requiere conservar la revisión adversarial y los work units antes del commit/PR.
+- No consta `size:exception`; la estrategia era `auto-chain`, no `single-pr`.
 
-**SUGGESTION**: None beyond what's already tracked.
+## Riesgos y bloqueadores exactos
 
-## TDD Compliance
+### CRITICAL
 
-| Check | Result | Details |
-|-------|--------|---------|
-| TDD Evidence reported | ✅ | Present in `apply-progress.md` for both the original PR2 apply and the 4R remediation pass |
-| All tasks have tests | ✅ | 12 test files touched/created for PR2, plus 6 more touched for remediation |
-| RED confirmed | ✅ | Test files exist and RED failures documented per task |
-| GREEN confirmed | ✅ | `npm test` → 120/120 passing at time of this verify |
-| Triangulation adequate | ✅ | Multiple cases per behavior throughout (household isolation, active/inactive, error codes, case sensitivity) |
-| Safety Net for modified files | ✅ | Each remediation fix records a pre-change safety-net run |
+1. La tarea real de `OperacionesBootstrap` + guardia DB sigue sin marcar; bloquea archivo y despliegue real/multi-instancia, aunque queda fuera del PR3 aprobado.
 
-**TDD Compliance**: 6/6 checks passed
+### WARNING
 
-## Verdict
+1. `npx tsc --noEmit` no está verde: conserva 7 errores conocidos en tests.
+2. No hubo validación E2E/manual contra Supabase y proxy reales; la inyección de `x-vehiculos-access-token` debe configurarse en despliegue.
+3. El corte staged supera ampliamente el presupuesto de 400 líneas.
 
-**PASS WITH WARNINGS**
+## Conclusión pre-commit
 
-PR2 (tasks 5–9) is correctly and honestly implemented, including the full remediation of the prior 4-lens adversarial review. All 5 requested remediation items are verified present and tested, not just claimed. 120/120 tests pass, build is green, no PR3 scope creep, no migration touched, no privileged credentials reachable client-side. The only outstanding item is the explicitly-deferred real Postgres/Admin-API bootstrap implementation + DB uniqueness constraint, which is honestly represented as pending in `tasks.md` and does not block closing PR2, but **must** be resolved before any real/multi-instance deployment.
+El corte PR3 corregido supera la verificación funcional, de seguridad focalizada, observabilidad, estabilidad temporal, TDD y build. Puede pasar al lifecycle review/gate pre-commit como **PR3 parcial**, sin afirmar que el cambio OpenSpec completo está listo para archivo o despliegue real.
+
+## Addendum de verificación — `R3-REL-001`
+
+**Resultado: ✅ REMEDIADO**
+
+- El fallback de consola ya no escribe metadata arbitraria: solo conserva `codigo` cuando cumple un formato restringido y señala `digest` con valor `[redacted]`; descarta el resto.
+- El fallback no escribe `Error.message`. El reportador HTTP comparte la misma metadata sanitizada y descripción neutra del error.
+- Un reportador que devuelve una promesa/thenable rechazada no rompe al caller: el rechazo se consume y activa el fallback seguro.
+- RED observado: 2/10 pruebas focalizadas fallaron antes de implementar la sanitización, exponiendo los valores sensibles de las fixtures.
+- GREEN focalizado: `npm test -- src/modulos/vehiculos/interfaz/acciones/resultado-accion.test.ts src/app/vehiculos/error.test.tsx` → 2 archivos, 13/13 tests.
+- Suite: `npm test` → 34 archivos, 198/198 tests.
+- Tipos: `npx tsc --noEmit` → código 2 con exactamente los mismos 7 errores conocidos documentados; cero errores nuevos.
+
+## Addendum de verificación — bloqueadores finales `R3-001` y `R3-002`
+
+**Resultado: ✅ REMEDIADOS**
+
+- `R3-001`: token ausente e inválido rechazan antes de crear dependencias; ambos casos verifican explícitamente cero llamadas a `crearClienteSupabaseServidor` con mocks aislados por prueba.
+- `R3-002`: la prueba fija `TZ=America/Los_Angeles` y confirma que el formateo local de la fixture sería `31/1/2026`; el componente conserva `1/2/2026` por su formato UTC. La zona original siempre se restaura.
+- Focalizadas: `npm test -- src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.test.ts src/modulos/vehiculos/interfaz/componentes/historial-eventos.test.tsx` → 2 archivos, 13/13 tests.
+- Suite: `npm test` → 34 archivos, 198/198 tests.
+- Tipos: `npx tsc --noEmit` → código 2 con exactamente los 7 errores conocidos documentados; cero errores nuevos.
+- No se modificó código de producción ni se requirió build para esta remediación test-only.

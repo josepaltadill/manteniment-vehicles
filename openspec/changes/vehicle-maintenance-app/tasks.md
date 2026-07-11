@@ -135,40 +135,40 @@ Rollback: revertir UI/actions sin alterar dominio ni migraciones.
 
 ### 10. PR 3 — Validación y server actions
 
-- [ ] RED: crear pruebas de esquemas en `src/modulos/vehiculos/interfaz/validacion/esquemas-vehiculo.test.ts` y `esquemas-evento.test.ts` para campos obligatorios, coste opcional/no negativo y próximos vencimientos opcionales.
-- [ ] GREEN: implementar esquemas Zod en `src/modulos/vehiculos/interfaz/validacion/`.
-- [ ] GREEN: implementar server actions en `src/modulos/vehiculos/interfaz/acciones/acciones-vehiculos.ts` y `acciones-eventos.ts` llamando casos de uso/adaptadores de servidor.
-- [ ] GREEN: las actions deben devolver errores de validación comprensibles para alta incompleta y entradas inválidas.
-- [ ] REFACTOR: no añadir API REST interna salvo necesidad real.
+- [x] RED: crear pruebas de esquemas en `src/modulos/vehiculos/interfaz/validacion/esquemas-vehiculo.test.ts` y `esquemas-evento.test.ts` para campos obligatorios, coste opcional/no negativo y próximos vencimientos opcionales.
+- [x] GREEN: implementar esquemas Zod en `src/modulos/vehiculos/interfaz/validacion/`.
+- [x] GREEN: implementar server actions en `src/modulos/vehiculos/interfaz/acciones/acciones-vehiculos.ts` y `acciones-eventos.ts` llamando casos de uso/adaptadores de servidor.
+- [x] GREEN: las actions deben devolver errores de validación comprensibles para alta incompleta y entradas inválidas.
+- [x] REFACTOR: no añadir API REST interna salvo necesidad real.
 
 ### 11. PR 3 — Pantallas mínimas de vehículos
 
-- [ ] RED: crear pruebas de componentes o validaciones de render mínimas en `src/modulos/vehiculos/interfaz/componentes/*.test.tsx` si el setup elegido soporta React Testing Library; si no, registrar verificación manual reproducible.
-- [ ] GREEN: implementar `src/app/vehiculos/page.tsx`, `src/app/vehiculos/nuevo/page.tsx`, `formulario-vehiculo.tsx` y `lista-vehiculos.tsx`.
-- [ ] GREEN: mostrar matrícula, marca, modelo, estado y kilometraje actual, distinguiendo activos/inactivos.
-- [ ] GREEN: permitir alta de vehículo y desactivación lógica desde server action.
-- [ ] REFACTOR: mantener componentes presentacionales pequeños; la lógica de negocio no vive en React.
+- [x] RED/GREEN: sin React Testing Library en el setup (`vitest.config.ts` usa `environment: 'node'`, sin jsdom ni RTL instalados); la lógica extraíble a función pura (`aVehiculoVista`) sí tiene ciclo RED→GREEN real en `interfaz/vistas/vehiculo-vista.test.ts`. El resto se cubre con checklist de verificación manual reproducible (ver `apply-progress.md`).
+- [x] GREEN: implementar `src/app/vehiculos/page.tsx`, `src/app/vehiculos/nuevo/page.tsx`, `formulario-vehiculo.tsx` y `lista-vehiculos.tsx`.
+- [x] GREEN: mostrar matrícula, marca, modelo, estado y kilometraje actual, distinguiendo activos/inactivos.
+- [x] GREEN: permitir alta de vehículo y desactivación lógica desde server action.
+- [x] REFACTOR: mantener componentes presentacionales pequeños; la lógica de negocio no vive en React.
 
 ### 12. PR 3 — Historial, eventos, corrección de kilometraje y vencimientos
 
-- [ ] RED: cubrir con pruebas de caso de uso o verificación manual los flujos de registrar mantenimiento, registrar avería, evento con km mayor, evento histórico, corrección manual y vencimiento por km/fecha.
-- [ ] GREEN: implementar `src/app/vehiculos/[vehiculoId]/page.tsx`, `src/app/vehiculos/[vehiculoId]/eventos/nuevo/page.tsx`, `formulario-evento.tsx` y `historial-eventos.tsx`.
-- [ ] GREEN: mostrar histórico de eventos de vehículos activos e inactivos.
-- [ ] GREEN: permitir registrar mantenimiento/avería con próximos vencimientos opcionales.
-- [ ] GREEN: permitir corrección manual de kilometraje hacia arriba o hacia abajo.
-- [ ] GREEN: mostrar estado calculado de vencimiento sin persistir estado derivado.
-- [ ] REFACTOR: evitar dashboard avanzado; mantener solo lo necesario del MVP.
+- [x] RED/GREEN: flujos de registrar mantenimiento/avería, evento con km mayor, evento histórico y corrección manual ya cubiertos por casos de uso existentes (PR1/PR2, `vehiculos-casos-uso.test.ts`, `registrar-evento-vehiculo.test.ts`) más los nuevos `obtener-vehiculo.test.ts`/`listar-eventos-vehiculo.test.ts` y las pruebas de las server actions (`acciones-eventos.test.ts`) que ejercitan el flujo completo entrada→caso de uso→repositorio en memoria. Vencimiento por km/fecha cubierto en `dominio/vencimiento.test.ts` (PR1) y proyectado a interfaz en `interfaz/vistas/evento-vista.test.ts`. La composición visual en páginas/componentes React se verifica con checklist manual (ver `apply-progress.md`), consistente con la tarea 11.
+- [x] GREEN: implementar `src/app/vehiculos/[vehiculoId]/page.tsx`, `src/app/vehiculos/[vehiculoId]/eventos/nuevo/page.tsx`, `formulario-evento.tsx` y `historial-eventos.tsx`.
+- [x] GREEN: mostrar histórico de eventos de vehículos activos e inactivos.
+- [x] GREEN: permitir registrar mantenimiento/avería con próximos vencimientos opcionales.
+- [x] GREEN: permitir corrección manual de kilometraje hacia arriba o hacia abajo.
+- [x] GREEN: mostrar estado calculado de vencimiento sin persistir estado derivado.
+- [x] REFACTOR: evitar dashboard avanzado; mantener solo lo necesario del MVP.
 
 ### 13. Verificación final del MVP
 
-- [ ] Ejecutar `npm test` y guardar evidencia en el reporte de aplicación/verificación.
-- [ ] Revisar que el dominio no importa Next.js, React, Supabase, Zod ni Tailwind, ni conoce `householdId`.
-- [ ] Revisar que todas las tablas/artefactos SQL usan prefijo `mv_`.
-- [ ] Revisar que la unicidad de matrícula es por hogar (`unique (household_id, matricula)`) y que existe aislamiento por hogar en repositorios y adaptador.
-- [ ] Revisar que evento + actualización de kilometraje usa contrato atómico/coordinado.
-- [ ] Revisar que no hay acceso inseguro desde navegador a Supabase para datos de app.
-- [ ] Revisar que no hay claves privilegiadas en cliente.
-- [ ] Confirmar que OCR, IA, adjuntos, notificaciones y dashboard avanzado no se implementaron.
+- [x] Ejecutar `npm test` y guardar evidencia en el reporte de aplicación/verificación. → 28 archivos, 158 tests, todos en verde (ver `apply-progress.md`).
+- [x] Revisar que el dominio no importa Next.js, React, Supabase, Zod ni Tailwind, ni conoce `householdId`. → confirmado por `rg` (sin coincidencias).
+- [x] Revisar que todas las tablas/artefactos SQL usan prefijo `mv_`. → sin migración nueva/modificada en este PR; las cuatro tablas siguen con prefijo `mv_`.
+- [x] Revisar que la unicidad de matrícula es por hogar (`unique (household_id, matricula)`) y que existe aislamiento por hogar en repositorios y adaptador. → sin cambios respecto a PR2, sigue verificado.
+- [x] Revisar que evento + actualización de kilometraje usa contrato atómico/coordinado. → sin cambios respecto a PR2, sigue verificado; las nuevas server actions reutilizan el mismo caso de uso/UoW.
+- [x] Revisar que no hay acceso inseguro desde navegador a Supabase para datos de app. → `seguridad-servidor.test.ts` (7/7, barre todo `src/`) confirma que los 3 componentes cliente nuevos no importan `adaptadores/supabase`.
+- [x] Revisar que no hay claves privilegiadas en cliente. → `rg` sin coincidencias de `service_role` ni `NEXT_PUBLIC_` en `src/`.
+- [x] Confirmar que OCR, IA, adjuntos, notificaciones y dashboard avanzado no se implementaron. → confirmado, solo se implementaron las pantallas mínimas descritas en el diseño.
 
 ## Mapa de cobertura de aceptación
 

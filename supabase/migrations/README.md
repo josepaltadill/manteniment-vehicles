@@ -181,6 +181,24 @@ administrativo aislado descrito arriba; su implementación real contra
 Postgres/Supabase (fuera del cliente anon-key normal) queda pendiente de entorno
 Supabase real disponible — ver blocker documentado en `apply-progress.md`.
 
+### PR3 — composición de servidor y `SUPABASE_HOUSEHOLD_ID_DESARROLLO`
+
+PR3 (interfaz mínima + server actions, `src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.ts`)
+compone las server actions/páginas contra los adaptadores Supabase reales de PR2
+(`RepositorioVehiculosSupabase`, `RepositorioEventosSupabase`), pero **no** resuelve
+auth real ni ejecuta el bootstrap en cada petición: sigue usando el patrón temporal
+de identidad de PR1/PR2 (`ProveedorIdentidadTemporal`), construido con un
+`householdId` fijo. Como `mv_households.id`/`mv_vehiculos.household_id` son `uuid`
+reales, ese valor fijo debe ser el UUID real ya sembrado por
+`sembrarHogarDeDesarrollo` (ejecutado una única vez, fuera de banda, por un operador
+con acceso administrativo — sigue sin implementación real en este PR, ver arriba),
+no un texto arbitrario como `'hogar-desarrollo'`. Por eso se añadió la variable de
+entorno obligatoria `SUPABASE_HOUSEHOLD_ID_DESARROLLO`: debe contener ese UUID real
+una vez exista un entorno Supabase disponible. Sin entorno Supabase real, esta
+composición sigue sin poder ejecutarse de extremo a extremo en esta sesión (mismo
+blocker de infraestructura ya documentado para PR2); se valida con dobles
+deterministas del cliente, igual que el resto de adaptadores de PR2.
+
 ### Variables de entorno de servidor (nunca `NEXT_PUBLIC_*`)
 
 Deliberadamente ninguna variable usada por el adaptador de datos de app usa el
@@ -188,7 +206,8 @@ prefijo `NEXT_PUBLIC_*`: esta app no tiene ningún camino de acceso browser-side
 `mv_vehiculos`/`mv_eventos_vehiculo` en este PR, así que no hay necesidad de exponer
 nada al cliente. Los nombres exactos (sin valores reales) son:
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_BOOTSTRAP_EMAIL`,
-`SUPABASE_BOOTSTRAP_PASSWORD` y `SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE`. Ver
+`SUPABASE_BOOTSTRAP_PASSWORD`, `SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE` y (desde PR3)
+`SUPABASE_HOUSEHOLD_ID_DESARROLLO`. Ver
 `src/compartido/infraestructura/entorno.ts` para la validación, que además rechaza
 explícitamente cualquier nombre `NEXT_PUBLIC_*`.
 
