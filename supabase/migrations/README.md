@@ -256,8 +256,21 @@ lee `SUPABASE_BOOTSTRAP_DATABASE_URL`, `SUPABASE_BOOTSTRAP_EMAIL`,
 `OperacionesBootstrapPostgres`, ejecuta `sembrarHogarDeDesarrollo` y siempre
 cierra la conexión privilegiada, tanto si la siembra termina como si falla
 (preservando el error original de siembra si el propio cierre también falla).
-Debe invocarse desde un runner de servidor u
-operación administrativa controlada, nunca desde server actions, componentes
-React ni el cliente Supabase de la aplicación. No usa claves `service_role`; la
-URL y contraseña se proporcionan solo al proceso operador, sin prefijo
-`NEXT_PUBLIC_*` y sin guardar valores reales en el repositorio.
+No usa claves `service_role`; la URL y contraseña se proporcionan solo al
+proceso operador, sin prefijo `NEXT_PUBLIC_*` y sin guardar valores reales en
+el repositorio.
+
+El runner concreto para invocarlo es `scripts/bootstrap-admin.ts`, ejecutado con:
+
+```sh
+SUPABASE_BOOTSTRAP_DATABASE_URL=... \
+SUPABASE_BOOTSTRAP_EMAIL=... \
+SUPABASE_BOOTSTRAP_PASSWORD=... \
+SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE=... \
+npm run bootstrap:admin
+```
+
+Nunca desde server actions, componentes React ni el cliente Supabase de la
+aplicación. El script reporta `householdId`/`userId` sembrados y sale con
+código 0 en éxito; falla con código distinto de 0 y un mensaje explícito en
+stderr si falta alguna variable privada o si la siembra falla.
