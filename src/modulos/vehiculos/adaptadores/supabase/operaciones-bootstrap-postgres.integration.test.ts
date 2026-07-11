@@ -28,6 +28,24 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
     await conexion.end();
   });
 
+  it('depende de que GoTrue siga teniendo el índice único parcial users_email_partial_key', async () => {
+    const conexion = await obtenerCliente();
+
+    // Canary explícito del esquema interno del que crearUsuario depende:
+    // `on conflict (email) where is_sso_user = false` solo resuelve
+    // conflictos si este índice existe con esta definición exacta. Si una
+    // futura versión de GoTrue lo renombra/cambia, este test falla con un
+    // mensaje directo en vez de que el fallo aparezca como un misterioso
+    // "no unique or exclusion constraint matching" dentro de crearUsuario.
+    const indices = await conexion.query<{ indexdef: string }>(
+      `select indexdef from pg_indexes where schemaname = 'auth' and tablename = 'users' and indexname = 'users_email_partial_key'`,
+    );
+
+    expect(indices.rows).toHaveLength(1);
+    expect(indices.rows[0]?.indexdef).toMatch(/unique index users_email_partial_key on auth\.users using btree \(email\)/i);
+    expect(indices.rows[0]?.indexdef).toMatch(/where \(is_sso_user = false\)/i);
+  });
+
   it('siembra idempotentemente usuario, hogar y membresía admin con ids reales', async () => {
     const sufijo = randomUUID();
     const entorno = {
