@@ -314,15 +314,38 @@ export async function crearOperacionesBootstrapPostgres(
 type EntornoBootstrapPostgres = Readonly<Record<string, string | undefined>>;
 type OperacionesBootstrapCerrables = OperacionesBootstrap & Readonly<{ cerrar(): Promise<void> }>;
 type DependenciasBootstrapPostgres = Readonly<{
-  crearOperaciones(databaseUrl: string): Promise<OperacionesBootstrapCerrables>;
+  crearOperaciones(databaseUrl: string, opciones?: OpcionesConexionBootstrap): Promise<OperacionesBootstrapCerrables>;
   sembrar: typeof sembrarHogarDeDesarrollo;
 }>;
+
+/**
+ * Lee un override numérico opcional del presupuesto de conexión desde el
+ * entorno (`SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS`/`_RETRIES`/`_BACKOFF_MS`).
+ * Sin la variable definida, devuelve `undefined` para que
+ * `crearOperacionesBootstrapPostgres` aplique su propio valor por defecto.
+ */
+function leerOpcionNumericaOpcional(entorno: EntornoBootstrapPostgres, nombre: string): number | undefined {
+  const valor = entorno[nombre];
+  if (valor === undefined || valor.trim().length === 0) return undefined;
+
+  const numero = Number(valor);
+  if (!Number.isFinite(numero) || numero <= 0) {
+    throw new Error(`La variable ${nombre} debe ser un número positivo; se recibió "${valor}".`);
+  }
+  return numero;
+}
 
 /**
  * Punto de entrada operativo server-only para la siembra administrativa.
  *
  * Lee exclusivamente variables privadas del proceso y garantiza que la conexión
- * privilegiada se cierre tanto si la siembra termina como si falla.
+ * privilegiada se cierre tanto si la siembra termina como si falla. El
+ * presupuesto de conexión (timeout/reintentos/backoff) es ajustable vía
+ * `SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS`, `SUPABASE_BOOTSTRAP_CONNECT_RETRIES`
+ * y `SUPABASE_BOOTSTRAP_CONNECT_BACKOFF_MS` — sin ellas, se usan los valores
+ * por defecto de `crearOperacionesBootstrapPostgres`. Un Supabase pausado/frío
+ * puede tardar bastante más que el presupuesto por defecto en aceptar
+ * conexión; esto evita tener que editar el código fuente para ese caso.
  */
 export async function ejecutarBootstrapPostgresDesdeEntorno(
   entorno: EntornoBootstrapPostgres = process.env,
@@ -340,7 +363,12 @@ export async function ejecutarBootstrapPostgresDesdeEntorno(
       'SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE',
     ),
   };
-  const operaciones = await dependencias.crearOperaciones(databaseUrl);
+  const opcionesConexion: OpcionesConexionBootstrap = {
+    connectionTimeoutMillis: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS'),
+    intentosConexion: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_RETRIES'),
+    backoffBaseMs: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_BACKOFF_MS'),
+  };
+  const operaciones = await dependencias.crearOperaciones(databaseUrl, opcionesConexion);
 
   let resultado: Awaited<ReturnType<typeof dependencias.sembrar>>;
   try {
