@@ -24,6 +24,12 @@ type FilaMembresia = Readonly<{ rol: string }>;
  * Nunca debe importarse desde componentes, rutas cliente o acciones de producto. Su
  * conexión PostgreSQL tiene privilegios administrativos porque debe sembrar el primer
  * usuario y la primera membresía, operaciones que RLS bloquea deliberadamente.
+ *
+ * El `import 'server-only'` de arriba solo hace fallar el build si este módulo se
+ * bundlea para un Client Component; no impide que una Server Action u otra ruta de
+ * servidor lo importe indebidamente, ya que ambas comparten el mismo grafo de
+ * compilación server-side. Ver issue de seguimiento sobre limitar quién puede
+ * importar este módulo.
  */
 export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
   constructor(private readonly cliente: ClientePostgresBootstrap) {}

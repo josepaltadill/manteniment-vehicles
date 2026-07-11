@@ -15,6 +15,12 @@
 // La migración `20260711000000_mv_households_nombre_unique.sql` protege la creación
 // concurrente de hogares. La reconsulta posterior se conserva como defensa adicional
 // para detectar datos históricos corruptos o un adaptador administrativo incorrecto.
+//
+// El `import 'server-only'` de abajo solo hace fallar el build si este módulo se
+// bundlea para un Client Component; no impide que una Server Action u otra ruta de
+// servidor lo importe indebidamente, ya que ambas comparten el mismo grafo de
+// compilación server-side. Ver issue de seguimiento sobre limitar quién puede
+// importar este módulo.
 import 'server-only';
 import { crearIdentificador, type Identificador } from '../../../../compartido/dominio/identificador';
 
