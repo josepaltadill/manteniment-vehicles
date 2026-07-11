@@ -87,3 +87,40 @@ export function detectarModulosBootstrapSinServerOnly(archivos: readonly string[
     .filter((archivo) => MODULOS_BOOTSTRAP_ADMIN.some((nombre) => archivo.endsWith(nombre)))
     .filter((archivo) => !IMPORT_SERVER_ONLY.test(readFileSync(archivo, 'utf8')));
 }
+
+// `server-only` (arriba) no protege contra un import desde una Server Action u
+// otra ruta de servidor: comparten el mismo grafo de compilación donde ese
+// paquete es un no-op. Esta allowlist es el chequeo real de "quién puede
+// importar el bootstrap administrativo": si aparece un importador no listado,
+// falla en vez de depender de que nadie lo importe mal por accidente.
+const IMPORTADORES_PERMITIDOS_DE_BOOTSTRAP = new Set([
+  'operaciones-bootstrap-postgres.ts', // usa bootstrap-servidor.ts internamente
+  'bootstrap-admin.ts', // scripts/bootstrap-admin.ts: el único runner real (issue #8)
+]);
+
+function especificadoresBootstrap(contenido: string): string[] {
+  const especificadores: string[] = [];
+  for (const coincidencia of contenido.matchAll(IMPORT_ESPECIFICADOR)) {
+    especificadores.push(coincidencia[1] ?? '');
+  }
+  return especificadores;
+}
+
+function importaModuloBootstrap(especificadores: readonly string[]): boolean {
+  return especificadores.some(
+    (especificador) =>
+      especificador.endsWith('operaciones-bootstrap-postgres') || especificador.endsWith('/bootstrap-servidor'),
+  );
+}
+
+export function detectarImportadorNoPermitidoDeBootstrap(archivo: string, contenido: string): boolean {
+  const nombreArchivo = archivo.split('/').pop() ?? archivo;
+  if (IMPORTADORES_PERMITIDOS_DE_BOOTSTRAP.has(nombreArchivo)) return false;
+  if (MODULOS_BOOTSTRAP_ADMIN.some((nombre) => archivo.endsWith(nombre))) return false;
+
+  return importaModuloBootstrap(especificadoresBootstrap(contenido));
+}
+
+export function detectarImportadoresNoPermitidosDeBootstrap(archivos: readonly string[]): string[] {
+  return archivos.filter((archivo) => detectarImportadorNoPermitidoDeBootstrap(archivo, readFileSync(archivo, 'utf8')));
+}

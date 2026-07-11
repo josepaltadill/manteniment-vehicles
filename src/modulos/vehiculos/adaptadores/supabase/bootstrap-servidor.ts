@@ -19,8 +19,10 @@
 // El `import 'server-only'` de abajo solo hace fallar el build si este módulo se
 // bundlea para un Client Component; no impide que una Server Action u otra ruta de
 // servidor lo importe indebidamente, ya que ambas comparten el mismo grafo de
-// compilación server-side. Ver issue de seguimiento sobre limitar quién puede
-// importar este módulo.
+// compilación server-side. La protección real contra eso es la allowlist en
+// `seguridad-servidor.ts` (`detectarImportadoresNoPermitidosDeBootstrap`):
+// solo `operaciones-bootstrap-postgres.ts` y `scripts/bootstrap-admin.ts`
+// pueden importar este módulo; cualquier otro importador falla el test.
 import 'server-only';
 import { crearIdentificador, type Identificador } from '../../../../compartido/dominio/identificador';
 import type { RolUsuario } from '../../dominio/rol-usuario';

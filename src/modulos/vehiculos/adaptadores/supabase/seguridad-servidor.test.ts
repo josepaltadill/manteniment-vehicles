@@ -3,6 +3,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   contieneClavePrivilegiada,
+  detectarImportadorNoPermitidoDeBootstrap,
+  detectarImportadoresNoPermitidosDeBootstrap,
   detectarImportsClienteIndebidosEnContenido,
   detectarImportsClienteIndebidosEnRepositorio,
   detectarModulosBootstrapSinServerOnly,
@@ -10,6 +12,7 @@ import {
 } from './seguridad-servidor';
 
 const RAIZ_SRC = path.join(process.cwd(), 'src');
+const RAIZ_SCRIPTS = path.join(process.cwd(), 'scripts');
 
 describe('detectarImportsClienteIndebidosEnContenido', () => {
   it('detecta un import de un adaptador Supabase dentro de un archivo `use client`', () => {
@@ -59,6 +62,45 @@ describe('contieneClavePrivilegiada', () => {
   });
 });
 
+describe('detectarImportadorNoPermitidoDeBootstrap', () => {
+  it('reporta un archivo fuera de la allowlist que importa operaciones-bootstrap-postgres', () => {
+    const contenido =
+      "import { crearOperacionesBootstrapPostgres } from '../modulos/vehiculos/adaptadores/supabase/operaciones-bootstrap-postgres';\n";
+
+    expect(detectarImportadorNoPermitidoDeBootstrap('acciones-vehiculos.ts', contenido)).toBe(true);
+  });
+
+  it('reporta un archivo fuera de la allowlist que importa bootstrap-servidor', () => {
+    const contenido = "import { sembrarHogarDeDesarrollo } from './bootstrap-servidor';\n";
+
+    expect(detectarImportadorNoPermitidoDeBootstrap('acciones-vehiculos.ts', contenido)).toBe(true);
+  });
+
+  it('no reporta el runner real (scripts/bootstrap-admin.ts)', () => {
+    const contenido =
+      "import { ejecutarBootstrapPostgresDesdeEntorno } from '../src/modulos/vehiculos/adaptadores/supabase/operaciones-bootstrap-postgres';\n";
+
+    expect(detectarImportadorNoPermitidoDeBootstrap('scripts/bootstrap-admin.ts', contenido)).toBe(false);
+  });
+
+  it('no reporta a operaciones-bootstrap-postgres.ts importando bootstrap-servidor internamente', () => {
+    const contenido = "import { sembrarHogarDeDesarrollo } from './bootstrap-servidor';\n";
+
+    expect(
+      detectarImportadorNoPermitidoDeBootstrap(
+        'src/modulos/vehiculos/adaptadores/supabase/operaciones-bootstrap-postgres.ts',
+        contenido,
+      ),
+    ).toBe(false);
+  });
+
+  it('no reporta un archivo que no importa ninguno de los dos módulos de bootstrap', () => {
+    const contenido = "import { useState } from 'react';\n";
+
+    expect(detectarImportadorNoPermitidoDeBootstrap('componente.tsx', contenido)).toBe(false);
+  });
+});
+
 describe('guardas de seguridad sobre el repositorio real', () => {
   // Los archivos `.test.ts(x)` quedan excluidos de este barrido: pueden contener
   // patrones prohibidos deliberadamente como literales de prueba (fixtures/
@@ -89,5 +131,13 @@ describe('guardas de seguridad sobre el repositorio real', () => {
     const archivosSinGuard = detectarModulosBootstrapSinServerOnly(archivosDeProduccion());
 
     expect(archivosSinGuard).toEqual([]);
+  });
+
+  it('solo la allowlist explícita importa los módulos de bootstrap administrativo', () => {
+    const archivos = [...archivosDeProduccion(), ...listarArchivosFuente(RAIZ_SCRIPTS)];
+
+    const hallazgos = detectarImportadoresNoPermitidosDeBootstrap(archivos);
+
+    expect(hallazgos).toEqual([]);
   });
 });
