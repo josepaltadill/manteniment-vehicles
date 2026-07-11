@@ -74,3 +74,16 @@ const PATRON_CLAVE_PRIVILEGIADA = /service_role_key|supabase_service_role/i;
 export function contieneClavePrivilegiada(contenido: string): boolean {
   return PATRON_CLAVE_PRIVILEGIADA.test(contenido);
 }
+
+// Módulos que bypassean RLS a propósito (sembrado administrativo). Deben
+// declarar `import 'server-only'` como defensa en profundidad además del
+// comentario JSDoc: el comentario no falla el build si alguien los importa
+// desde un componente cliente o Server Action sin chequeo propio.
+const MODULOS_BOOTSTRAP_ADMIN = ['operaciones-bootstrap-postgres.ts', 'bootstrap-servidor.ts'];
+const IMPORT_SERVER_ONLY = /^\s*import\s+['"]server-only['"];?\s*$/m;
+
+export function detectarModulosBootstrapSinServerOnly(archivos: readonly string[]): string[] {
+  return archivos
+    .filter((archivo) => MODULOS_BOOTSTRAP_ADMIN.some((nombre) => archivo.endsWith(nombre)))
+    .filter((archivo) => !IMPORT_SERVER_ONLY.test(readFileSync(archivo, 'utf8')));
+}

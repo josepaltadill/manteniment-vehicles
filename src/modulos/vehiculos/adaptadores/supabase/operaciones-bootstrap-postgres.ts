@@ -1,3 +1,4 @@
+import 'server-only';
 import {
   sembrarHogarDeDesarrollo,
   type EntradaBootstrap,

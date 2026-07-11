@@ -5,6 +5,7 @@ import {
   contieneClavePrivilegiada,
   detectarImportsClienteIndebidosEnContenido,
   detectarImportsClienteIndebidosEnRepositorio,
+  detectarModulosBootstrapSinServerOnly,
   listarArchivosFuente,
 } from './seguridad-servidor';
 
@@ -82,5 +83,11 @@ describe('guardas de seguridad sobre el repositorio real', () => {
     });
 
     expect(archivosConClave).toEqual([]);
+  });
+
+  it('los módulos de bootstrap administrativo declaran `import \'server-only\'`', () => {
+    const archivosSinGuard = detectarModulosBootstrapSinServerOnly(archivosDeProduccion());
+
+    expect(archivosSinGuard).toEqual([]);
   });
 });

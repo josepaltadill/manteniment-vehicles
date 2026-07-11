@@ -15,6 +15,7 @@
 // La migración `20260711000000_mv_households_nombre_unique.sql` protege la creación
 // concurrente de hogares. La reconsulta posterior se conserva como defensa adicional
 // para detectar datos históricos corruptos o un adaptador administrativo incorrecto.
+import 'server-only';
 import { crearIdentificador, type Identificador } from '../../../../compartido/dominio/identificador';
 
 export class ErrorRaceBootstrapHogar extends Error {
