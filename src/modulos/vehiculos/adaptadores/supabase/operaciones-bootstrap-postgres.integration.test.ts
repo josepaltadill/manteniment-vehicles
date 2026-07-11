@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { Client } from 'pg';
 import { afterAll, describe, expect, it } from 'vitest';
-import { ejecutarBootstrapPostgresDesdeEntorno } from './operaciones-bootstrap-postgres';
+import {
+  ejecutarBootstrapPostgresDesdeEntorno,
+  OperacionesBootstrapPostgres,
+} from './operaciones-bootstrap-postgres';
 
 const databaseUrl = process.env.SUPABASE_BOOTSTRAP_DATABASE_URL;
 const ejecutar = databaseUrl ? describe : describe.skip;
@@ -45,5 +48,20 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
 
     expect(segunda).toEqual(primera);
     expect(membresias.rows).toEqual([{ rol: 'admin' }]);
+  });
+
+  it('crearHogar resuelve un nombre duplicado mediante la restricción única en vez de crear una segunda fila', async () => {
+    const conexion = await obtenerCliente();
+    const operaciones = new OperacionesBootstrapPostgres({ query: conexion.query.bind(conexion) });
+    const nombre = `Hogar duplicado ${randomUUID()}`;
+
+    const primero = await operaciones.crearHogar(nombre);
+    const segundo = await operaciones.crearHogar(nombre);
+    const conteo = await operaciones.contarHogaresPorNombre(nombre);
+
+    expect(segundo.id).toBe(primero.id);
+    expect(conteo).toBe(1);
+
+    await conexion.query('delete from public.mv_households where id = $1', [primero.id]);
   });
 });
