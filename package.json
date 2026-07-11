@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run",
-    "bootstrap:admin": "NODE_OPTIONS=\"--import ./scripts/hooks/register-server-only-loader.mjs\" tsx scripts/bootstrap-admin.ts"
+    "bootstrap:admin": "NODE_OPTIONS=\"--import ./scripts/hooks/register-server-only-loader.mjs\" tsx scripts/bootstrap-admin.ts",
+    "dev:local": "bash scripts/dev-local.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.2",

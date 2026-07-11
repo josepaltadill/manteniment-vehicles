@@ -304,8 +304,45 @@ Si el usuario/hogar sembrados ya tienen una membresía con un rol distinto de
 requiere resolución manual. Reejecutar el bootstrap nunca debe revertir en
 silencio una decisión de rol tomada fuera de él.
 
-Si el usuario/hogar sembrados ya tienen una membresía con un rol distinto de
-`admin` (por ejemplo, alguien lo degradó a `editor` manualmente), el bootstrap
-**no la sobrescribe**: falla explícito con `ErrorMembresiaNoAdminBootstrap` y
-requiere resolución manual. Reejecutar el bootstrap nunca debe revertir en
-silencio una decisión de rol tomada fuera de él.
+## Entorno local: de cero a `npm run dev`
+
+Levantar la app localmente contra Supabase real implica varios pasos que antes
+estaban repartidos entre este archivo, `entorno.ts` y
+`dependencias-servidor.ts`. La forma más corta es un solo comando:
+
+```sh
+npm run dev:local
+```
+
+Esto (`scripts/dev-local.sh`): levanta el stack local de Supabase si no está
+corriendo, siembra (o reutiliza, es idempotente) un hogar/usuario de
+desarrollo vía `npm run bootstrap:admin`, y arranca `next dev` con las
+variables de entorno ya resueltas — incluyendo `SUPABASE_HOUSEHOLD_ID_DESARROLLO`,
+extraído automáticamente de la salida del bootstrap. Usa valores por defecto
+razonables (`dev@ejemplo.local`, `Hogar de desarrollo`,
+`token-desarrollo-local`); sobreescribibles seteando
+`SUPABASE_BOOTSTRAP_EMAIL`/`_PASSWORD`/`_HOUSEHOLD_NOMBRE`/`VEHICULOS_ACCESS_TOKEN`
+antes de invocarlo.
+
+Cualquier cliente HTTP (navegador, `curl`, un test) debe mandar el header
+`x-vehiculos-access-token` con el mismo valor de `VEHICULOS_ACCESS_TOKEN`, o
+`/vehiculos` responde 500 (`ErrorAccesoVehiculos`, ver
+`dependencias-servidor.ts`) — es el guard de acceso de PR3, no un bug.
+
+Si se prefiere correr los pasos a mano (o entender qué hace el script), son,
+en orden:
+
+1. `supabase start` (o `supabase db reset` para reaplicar migraciones desde
+   cero) — levanta Postgres/Auth/etc. locales.
+2. `npm run bootstrap:admin` con `SUPABASE_BOOTSTRAP_DATABASE_URL`/`_EMAIL`/
+   `_PASSWORD`/`_HOUSEHOLD_NOMBRE` (ver sección de arriba) — siembra el primer
+   admin y devuelve `householdId`/`userId` reales.
+3. Setear las 6 variables de `EntornoSupabase` para `next dev`: `SUPABASE_URL`,
+   `SUPABASE_ANON_KEY` (ambas de `supabase status -o env`),
+   `SUPABASE_BOOTSTRAP_EMAIL`/`_PASSWORD`/`_HOUSEHOLD_NOMBRE` (las mismas del
+   paso 2) y `SUPABASE_HOUSEHOLD_ID_DESARROLLO` (el `householdId` real que
+   imprimió el paso 2).
+4. Setear `VEHICULOS_ACCESS_TOKEN` y mandar el header correspondiente en cada
+   request a `/vehiculos`.
+
+Ver `.env.local.example` para una plantilla copiable de las 7 variables.
