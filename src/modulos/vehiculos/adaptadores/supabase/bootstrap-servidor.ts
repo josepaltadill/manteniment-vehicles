@@ -36,6 +36,18 @@ export class ErrorRaceBootstrapHogar extends Error {
   }
 }
 
+export class ErrorMembresiaNoAdminBootstrap extends Error {
+  constructor(householdId: string, userId: string, rolActual: string) {
+    super(
+      `El usuario de bootstrap ${userId} ya tiene una membresía en el hogar ${householdId} ` +
+        `con rol "${rolActual}", no "admin". El bootstrap no sobrescribe roles existentes: ` +
+        'si este cambio de rol fue intencional, resolver manualmente (decidir si corresponde ' +
+        'promover a admin o si el bootstrap está apuntando al hogar/usuario equivocado) antes de reintentar.',
+    );
+    this.name = 'ErrorMembresiaNoAdminBootstrap';
+  }
+}
+
 export type OperacionesBootstrap = Readonly<{
   buscarUsuarioPorEmail(email: string): Promise<{ id: string } | null>;
   crearUsuario(email: string, password: string): Promise<{ id: string }>;
@@ -85,6 +97,8 @@ export async function sembrarHogarDeDesarrollo(
 
   if (!membresia) {
     await operaciones.crearMembresiaAdmin(hogar.id, usuario.id);
+  } else if (membresia.rol !== 'admin') {
+    throw new ErrorMembresiaNoAdminBootstrap(hogar.id, usuario.id, membresia.rol);
   }
 
   return {

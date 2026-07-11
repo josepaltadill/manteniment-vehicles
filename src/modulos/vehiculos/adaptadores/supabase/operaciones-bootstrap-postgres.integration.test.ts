@@ -83,4 +83,43 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
 
     await conexion.query('delete from public.mv_households where id = $1', [primero.id]);
   });
+
+  it('falla explícito en vez de sobrescribir una membresía existente con rol distinto de admin', async () => {
+    const conexion = await obtenerCliente();
+    const operaciones = new OperacionesBootstrapPostgres({ query: conexion.query.bind(conexion) });
+    const sufijo = randomUUID();
+    const email = `bootstrap-rol-${sufijo}@ejemplo.local`;
+    const nombreHogar = `Hogar rol ${sufijo}`;
+
+    const usuario = await operaciones.crearUsuario(email, 'password-local-de-prueba');
+    const hogar = await operaciones.crearHogar(nombreHogar);
+    await conexion.query(
+      `insert into public.mv_household_members (household_id, user_id, rol) values ($1, $2, 'editor')`,
+      [hogar.id, usuario.id],
+    );
+
+    try {
+      await expect(
+        ejecutarBootstrapPostgresDesdeEntorno({
+          SUPABASE_BOOTSTRAP_DATABASE_URL: databaseUrl,
+          SUPABASE_BOOTSTRAP_EMAIL: email,
+          SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
+          SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: nombreHogar,
+        }),
+      ).rejects.toThrow(/rol "editor"/);
+
+      const membresias = await conexion.query<{ rol: string }>(
+        'select rol from public.mv_household_members where household_id = $1 and user_id = $2',
+        [hogar.id, usuario.id],
+      );
+      expect(membresias.rows).toEqual([{ rol: 'editor' }]);
+    } finally {
+      await conexion.query(
+        'delete from public.mv_household_members where household_id = $1 and user_id = $2',
+        [hogar.id, usuario.id],
+      );
+      await conexion.query('delete from public.mv_households where id = $1', [hogar.id]);
+      await conexion.query('delete from auth.users where id = $1', [usuario.id]);
+    }
+  });
 });

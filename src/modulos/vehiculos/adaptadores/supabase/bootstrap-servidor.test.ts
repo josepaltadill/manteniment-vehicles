@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  ErrorMembresiaNoAdminBootstrap,
   ErrorRaceBootstrapHogar,
   sembrarHogarDeDesarrollo,
   type OperacionesBootstrap,
@@ -86,5 +87,38 @@ describe('sembrarHogarDeDesarrollo', () => {
     expect(errorCapturado).toBeInstanceOf(ErrorRaceBootstrapHogar);
     expect((errorCapturado as Error).message).toMatch(/condición de carrera/i);
     expect(operaciones.contarHogaresPorNombre).toHaveBeenCalledTimes(1);
+  });
+
+  it('falla explícito en vez de sobrescribir un rol no-admin ya existente', async () => {
+    const { operaciones, estado } = crearOperacionesFalsas();
+    estado.usuario = { id: 'usuario-real-1' };
+    estado.hogar = { id: 'hogar-real-1' };
+    estado.membresia = { rol: 'editor' };
+
+    let errorCapturado: unknown;
+    try {
+      await sembrarHogarDeDesarrollo(operaciones, entornoBootstrap);
+    } catch (error) {
+      errorCapturado = error;
+    }
+
+    expect(errorCapturado).toBeInstanceOf(ErrorMembresiaNoAdminBootstrap);
+    expect((errorCapturado as Error).message).toMatch(/editor/i);
+    expect((errorCapturado as Error).message).toMatch(/hogar-real-1/);
+    expect((errorCapturado as Error).message).toMatch(/usuario-real-1/);
+    expect(operaciones.crearMembresiaAdmin).not.toHaveBeenCalled();
+  });
+
+  it('no hace nada si la membresía existente ya es admin', async () => {
+    const { operaciones, estado } = crearOperacionesFalsas();
+    estado.usuario = { id: 'usuario-real-1' };
+    estado.hogar = { id: 'hogar-real-1' };
+    estado.membresia = { rol: 'admin' };
+
+    const resultado = await sembrarHogarDeDesarrollo(operaciones, entornoBootstrap);
+
+    expect(operaciones.crearMembresiaAdmin).not.toHaveBeenCalled();
+    expect(resultado.householdId.valor).toBe('hogar-real-1');
+    expect(resultado.userId.valor).toBe('usuario-real-1');
   });
 });

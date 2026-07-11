@@ -282,3 +282,9 @@ Nunca desde server actions, componentes React ni el cliente Supabase de la
 aplicación. El script reporta `householdId`/`userId` sembrados y sale con
 código 0 en éxito; falla con código distinto de 0 y un mensaje explícito en
 stderr si falta alguna variable privada o si la siembra falla.
+
+Si el usuario/hogar sembrados ya tienen una membresía con un rol distinto de
+`admin` (por ejemplo, alguien lo degradó a `editor` manualmente), el bootstrap
+**no la sobrescribe**: falla explícito con `ErrorMembresiaNoAdminBootstrap` y
+requiere resolución manual. Reejecutar el bootstrap nunca debe revertir en
+silencio una decisión de rol tomada fuera de él.
