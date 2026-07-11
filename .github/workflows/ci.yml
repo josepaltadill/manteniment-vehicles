@@ -8,13 +8,18 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 24
           cache: npm
@@ -34,7 +39,7 @@ jobs:
       # in local dev) is what actually reproduces the schema correctly.
       # Deferred until after the cheaper type-check/build steps so a failure
       # there doesn't pay for spinning up the Docker-based stack first.
-      - uses: supabase/setup-cli@v3
+      - uses: supabase/setup-cli@46f7f98c7f948ad727d22c1e67fab04c223a0520 # v3
         with:
           version: latest
 
@@ -45,6 +50,10 @@ jobs:
         run: npm test
         env:
           SUPABASE_BOOTSTRAP_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+      - name: Dump Supabase stack status on failure
+        if: failure()
+        run: supabase status
 
       - name: Stop local Supabase stack
         if: always()
