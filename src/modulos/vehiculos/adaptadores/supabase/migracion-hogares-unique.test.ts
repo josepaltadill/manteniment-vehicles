@@ -9,4 +9,17 @@ describe('migración de unicidad de hogares', () => {
 
     expect(sql).toMatch(/add constraint mv_households_nombre_key unique \(nombre\)/i);
   });
+
+  it('bloquea la migración con un preflight automático si ya existen nombres duplicados', async () => {
+    const sql = await readFile(rutaMigracion, 'utf8');
+
+    expect(sql).toMatch(/raise exception/i);
+    expect(sql).toMatch(/group by nombre/i);
+    expect(sql).toMatch(/having count\(\*\) > 1/i);
+
+    const indiceGuardia = sql.search(/raise exception/i);
+    const indiceConstraint = sql.search(/add constraint mv_households_nombre_key unique \(nombre\)/i);
+    expect(indiceGuardia).toBeGreaterThan(-1);
+    expect(indiceGuardia).toBeLessThan(indiceConstraint);
+  });
 });

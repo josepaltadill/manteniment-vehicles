@@ -228,7 +228,20 @@ La migración `20260711000000_mv_households_nombre_unique.sql` añade
 `mv_households_nombre_key`, una restricción `unique (nombre)` que hace seguro el
 buscar-o-crear concurrente del hogar de desarrollo.
 
-Antes de aplicarla a una base existente, ejecutar un preflight de solo lectura:
+El preflight ya no depende solo de disciplina de operador: la propia migración
+incluye un guard (`do $$ ... raise exception ... end $$;`) que cuenta nombres
+duplicados en `mv_households` y aborta la transacción con un error explícito
+si encuentra alguno, antes de intentar añadir la restricción. Aplicar la
+migración a una base con duplicados falla de forma segura y explícita en vez
+de depender de que un operador recuerde correr una consulta manual antes.
+
+Si la migración falla por este guard, no borrar ni fusionar hogares de forma
+automática: identificar membresías, vehículos y eventos asociados, acordar cuál
+hogar se conserva, reasignar las referencias dentro de una transacción revisada
+y verificar de nuevo que no quedan duplicados antes de reintentar la migración.
+Si no puede demostrarse una consolidación segura, restaurar el backup verificado
+o preparar un fix-forward específico; nunca forzar la restricción perdiendo datos.
+Para inspeccionar los duplicados manualmente antes de intervenir:
 
 ```sql
 select nombre, count(*) as cantidad
@@ -237,18 +250,13 @@ group by nombre
 having count(*) > 1;
 ```
 
-Si devuelve filas, detener la migración. No borrar ni fusionar hogares de forma
-automática: identificar membresías, vehículos y eventos asociados, acordar cuál
-hogar se conserva, reasignar las referencias dentro de una transacción revisada
-y verificar de nuevo que no quedan duplicados antes de añadir la restricción.
-Si no puede demostrarse una consolidación segura, restaurar el backup verificado
-o preparar un fix-forward específico; nunca forzar la restricción perdiendo datos.
-
 `ejecutarBootstrapPostgresDesdeEntorno` es el punto de entrada **server-only**:
 lee `SUPABASE_BOOTSTRAP_DATABASE_URL`, `SUPABASE_BOOTSTRAP_EMAIL`,
 `SUPABASE_BOOTSTRAP_PASSWORD` y `SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE`, crea
-`OperacionesBootstrapPostgres`, ejecuta `sembrarHogarDeDesarrollo` y cierra la
-conexión privilegiada en `finally`. Debe invocarse desde un runner de servidor u
+`OperacionesBootstrapPostgres`, ejecuta `sembrarHogarDeDesarrollo` y siempre
+cierra la conexión privilegiada, tanto si la siembra termina como si falla
+(preservando el error original de siembra si el propio cierre también falla).
+Debe invocarse desde un runner de servidor u
 operación administrativa controlada, nunca desde server actions, componentes
 React ni el cliente Supabase de la aplicación. No usa claves `service_role`; la
 URL y contraseña se proporcionan solo al proceso operador, sin prefijo
