@@ -5,7 +5,7 @@ Este proyecto usa una instancia Supabase compartida. Las migraciones deben trata
 ## Reglas obligatorias
 
 - Todos los objetos propios de esta app deben usar prefijo `mv_`.
-- Las tablas permitidas en este corte son `mv_households`, `mv_household_members`, `mv_vehiculos` y `mv_eventos_vehiculo`.
+- Las tablas permitidas en este corte son `mv_households`, `mv_household_members`, `mv_vehiculos`, `mv_eventos_vehiculo` y `mv_platform_roles`.
 - No se permite ejecutar reset global de base de datos.
 - No se permite `drop schema`, `drop database` ni borrados no acotados.
 - Cualquier borrado de datos de prueba debe limitarse explícitamente a tablas `mv_*`.
@@ -103,7 +103,7 @@ Umbrales para tasa de errores o porcentaje fuera de SLO: **>1%** el release owne
 - [ ] No hay comandos globales peligrosos.
 - [ ] No hay referencias a tablas de otros proyectos.
 - [ ] Hay constraints para datos críticos: matrícula única por hogar, `household_id` obligatorio, FK compuesta evento/vehículo, kilometrajes no negativos, costes no negativos, estados/tipos válidos.
-- [ ] RLS está activado en las cuatro tablas sin policies permisivas globales; `anon` está revocado y los privilegios de `authenticated` tienen policies correspondientes.
+- [ ] RLS está activado en las cinco tablas sin policies permisivas globales; `anon` está revocado y los privilegios de `authenticated` tienen policies correspondientes. `mv_platform_roles` no concede grants ni policies a `anon` o `authenticated`.
 - [ ] Las policies de escritura usan `with check`; las funciones RLS tienen `security definer` endurecido, `search_path` vacío y no aceptan identidad de usuario del cliente.
 - [ ] Los triggers de membresía rechazan borrar al último `admin`, degradar su rol o moverlo a otro hogar; se permite el borrado en cascada de membresías cuando se elimina el propio hogar.
 - [ ] Los grants a `authenticated` están respaldados por RLS y se entienden solo como habilitación de su enforcement; no habilitan acceso directo de producto/navegador.
@@ -217,6 +217,25 @@ explícitamente cualquier nombre `NEXT_PUBLIC_*`.
 > (guarda de seguridad genérica anti-secretos, no específica de este proyecto).
 > Queda documentado aquí como blocker de herramienta; un operador humano puede
 > crear `.env.example` con estos cinco nombres sin valores.
+
+## Bootstrap seguro de `Familia Altadill` (PR 1)
+
+La migración `20260712000000_mv_platform_roles.sql` es aditiva: separa el rol de plataforma (`superadmin`) de la membresía familiar. Tiene RLS activada y no concede acceso a `anon` ni `authenticated`; no habilita rutas ni datos familiares.
+
+Antes de cualquier operación real, el operador debe registrar un backup restaurable, verificar una restauración y conservar los UUID Auth y conteos de vehículos/eventos. Nunca usar email como autoridad ni guardar credenciales en el repositorio.
+
+1. Ejecutar el preflight sin mutar datos (modo por defecto):
+   ```sh
+   SUPABASE_BOOTSTRAP_DATABASE_URL=... \
+   SUPABASE_BOOTSTRAP_ADMIN_USER_ID=<uuid-auth-verificado> \
+   npm run bootstrap:admin -- --check
+   ```
+2. Guardar el plan JSON y resolver cualquier `conflicto`. El plan muestra solo UUIDs, acciones y conteos; no imprime URL ni contraseñas.
+3. Si el hogar candidato conserva los datos existentes, volver a planificar con `--rename-from=<uuid-hogar>` para pedir explícitamente el renombrado a `Familia Altadill`. El UUID del hogar y los conteos deben permanecer iguales.
+4. `--apply --confirm` queda deliberadamente bloqueado en este corte: requiere ejecutar un plan transaccional revisado por el operador. No se crean, reasignan, promueven, borran ni renombran datos automáticamente.
+5. Ante conflicto o fallo, no aplicar correcciones automáticas. Conservar el plan/evidencia, restaurar el backup verificado si corresponde y preparar un fix-forward SQL revisado.
+
+El preflight rechaza UUID Auth inválido, nombre destino ambiguo, membresía `editor` inesperada y varias membresías candidatas. `mv_platform_roles` no se asigna automáticamente.
 
 ## Estado de conexión actual
 

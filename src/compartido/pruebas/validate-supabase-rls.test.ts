@@ -40,6 +40,24 @@ describe('validate-supabase-rls shell contracts', () => {
     expect(assertions).toContain("'post-negative.cross-household-event'");
   });
 
+  it('requires the closed mv_platform_roles migration and its RLS matrix', async () => {
+    const migrationPath = fileURLToPath(new URL('../../../supabase/migrations/20260712000000_mv_platform_roles.sql', import.meta.url));
+    const [migration, assertions] = await Promise.all([readFile(migrationPath, 'utf8'), readFile(fileURLToPath(new URL('../../../supabase/validation/assertions.sql', import.meta.url)), 'utf8')]);
+
+    expect(migration).toContain('create table public.mv_platform_roles');
+    expect(migration).toContain("check (rol = 'superadmin')");
+    expect(migration).toContain('references auth.users(id) on delete cascade');
+    expect(migration).toContain('enable row level security');
+    expect(migration).toContain('revoke all on public.mv_platform_roles from anon, authenticated');
+    expect(assertions).toContain("'anon.select.platform-roles'");
+    expect(assertions).toContain("'non-member.select.platform-roles'");
+    expect(assertions).toContain("'editor-a.select.platform-roles'");
+    expect(assertions).toContain("'admin-b.select.platform-roles'");
+    expect(assertions).toContain("'non-member.insert.platform-roles'");
+    expect(assertions).toContain("'non-member.update.platform-roles'");
+    expect(assertions).toContain("'non-member.delete.platform-roles'");
+  });
+
   it('requires two bounded concurrent last-admin sessions before the harness can pass', async () => {
     const harnessPath = fileURLToPath(new URL('../../../scripts/validate-supabase-rls.sh', import.meta.url));
     const sessionAPath = fileURLToPath(new URL('../../../supabase/validation/concurrency/session-a.sql', import.meta.url));
@@ -109,6 +127,8 @@ exit 1`);
     expect(harness).toContain('run_sql "$workspace/migration.sql" || return 1');
     expect(harness).toContain('run_sql "$workspace/fixtures.sql" || return 1');
     expect(harness).toContain('run_sql "$workspace/assertions.sql" || return 1');
+    expect(harness).toContain('20260711000000_mv_households_nombre_unique.sql');
+    expect(harness).toContain('missing-household-name-migration');
   });
 
   it('blocks without mutation when the Supabase CLI is unavailable', () => {

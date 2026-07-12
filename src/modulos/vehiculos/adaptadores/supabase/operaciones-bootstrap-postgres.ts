@@ -5,6 +5,8 @@ import {
   type EntradaBootstrap,
   type OperacionesBootstrap,
 } from './bootstrap-servidor';
+import { crearPlanBootstrapFamiliar } from './bootstrap-plan';
+import { inspeccionarBootstrapFamiliar } from './bootstrap-preflight';
 
 /** Cliente mínimo para aislar el acceso administrativo de Postgres en pruebas. */
 export type ClientePostgresBootstrap = Readonly<{
@@ -163,6 +165,11 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
        on conflict (household_id, user_id) do nothing`,
       [householdId, userId],
     );
+  }
+
+  async planificarBootstrapFamiliar(nombreDestino: string, adminUserId: string, confirmarRenombradoDesde?: string) {
+    const hogares = await inspeccionarBootstrapFamiliar(this.cliente, nombreDestino, adminUserId);
+    return crearPlanBootstrapFamiliar({ nombreDestino, adminUserId, confirmarRenombradoDesde, hogares });
   }
 
   async cerrar(): Promise<void> {
@@ -347,6 +354,16 @@ function leerOpcionNumericaOpcional(entorno: EntornoBootstrapPostgres, nombre: s
  * puede tardar bastante más que el presupuesto por defecto en aceptar
  * conexión; esto evita tener que editar el código fuente para ese caso.
  */
+export function leerOpcionesConexionBootstrapDesdeEntorno(
+  entorno: EntornoBootstrapPostgres = process.env,
+): OpcionesConexionBootstrap {
+  return {
+    connectionTimeoutMillis: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS'),
+    intentosConexion: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_RETRIES'),
+    backoffBaseMs: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_BACKOFF_MS'),
+  };
+}
+
 export async function ejecutarBootstrapPostgresDesdeEntorno(
   entorno: EntornoBootstrapPostgres = process.env,
   dependencias: DependenciasBootstrapPostgres = {
@@ -363,11 +380,7 @@ export async function ejecutarBootstrapPostgresDesdeEntorno(
       'SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE',
     ),
   };
-  const opcionesConexion: OpcionesConexionBootstrap = {
-    connectionTimeoutMillis: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS'),
-    intentosConexion: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_RETRIES'),
-    backoffBaseMs: leerOpcionNumericaOpcional(entorno, 'SUPABASE_BOOTSTRAP_CONNECT_BACKOFF_MS'),
-  };
+  const opcionesConexion = leerOpcionesConexionBootstrapDesdeEntorno(entorno);
   const operaciones = await dependencias.crearOperaciones(databaseUrl, opcionesConexion);
 
   let resultado: Awaited<ReturnType<typeof dependencias.sembrar>>;

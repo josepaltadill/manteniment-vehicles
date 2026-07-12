@@ -6,6 +6,7 @@ project_id = "__PROJECT_ID__"
 
 [api]
 enabled = false
+port = 54331
 
 [db]
 port = 54329

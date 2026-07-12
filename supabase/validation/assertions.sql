@@ -32,14 +32,15 @@ grant usage on schema validation to anon, authenticated;
 grant execute on all functions in schema validation to anon, authenticated;
 
 -- Structural proof before application-role assertions.
-select validation.case_result('schema.tables', '4-rls-tables', count(*)::text, count(*) = 4)
+select validation.case_result('schema.tables', '5-rls-tables', count(*)::text, count(*) = 5)
 from pg_class c join pg_namespace n on n.oid = c.relnamespace
-where n.nspname = 'public' and c.relname in ('mv_households','mv_household_members','mv_vehiculos','mv_eventos_vehiculo') and c.relrowsecurity;
+where n.nspname = 'public' and c.relname in ('mv_households','mv_household_members','mv_vehiculos','mv_eventos_vehiculo','mv_platform_roles') and c.relrowsecurity;
 
 -- anon receives no grants. This checks its role and denial without exposing rows.
 begin;
 set local role anon;
 select validation.expect_sqlstate('anon.select.households', 'select * from public.mv_households', '42501');
+select validation.expect_sqlstate('anon.select.platform-roles', 'select * from public.mv_platform_roles', '42501');
 select validation.expect_sqlstate('anon.insert.vehicle', $$insert into public.mv_vehiculos (household_id,marca,modelo,combustible,matricula,anio,kilometros_actuales,estado,fecha_compra,fecha_alta_aplicacion) values ('10000000-0000-0000-0000-00000000000a','X','X','X','ANON',2020,0,'activo',now(),now())$$, '42501');
 rollback;
 
@@ -50,6 +51,10 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000c1
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select validation.case_result('non-member.identity', 'authenticated/non-member', current_user || '/' || auth.uid()::text, current_user = 'authenticated' and auth.uid() = '00000000-0000-0000-0000-0000000000c1');
 select validation.case_result('non-member.select', '0', count(*)::text, count(*) = 0) from public.mv_households;
+select validation.expect_sqlstate('non-member.select.platform-roles', 'select * from public.mv_platform_roles', '42501');
+select validation.expect_sqlstate('non-member.insert.platform-roles', $$insert into public.mv_platform_roles (user_id, rol) values ('00000000-0000-0000-0000-0000000000c1', 'superadmin')$$, '42501');
+select validation.expect_sqlstate('non-member.update.platform-roles', $$update public.mv_platform_roles set rol = 'superadmin'$$, '42501');
+select validation.expect_sqlstate('non-member.delete.platform-roles', $$delete from public.mv_platform_roles$$, '42501');
 select validation.expect_sqlstate('non-member.insert.vehicle', $$insert into public.mv_vehiculos (household_id,marca,modelo,combustible,matricula,anio,kilometros_actuales,estado,fecha_compra,fecha_alta_aplicacion) values ('10000000-0000-0000-0000-00000000000a','X','X','X','NM-1',2020,0,'activo',now(),now())$$, '42501');
 select validation.expect_row_count('non-member.update.vehicle', $$update public.mv_vehiculos set modelo = 'blocked' where household_id = '10000000-0000-0000-0000-00000000000a'$$, 0);
 select validation.expect_row_count('non-member.delete.vehicle', $$delete from public.mv_vehiculos where household_id = '10000000-0000-0000-0000-00000000000a'$$, 0);
@@ -62,6 +67,7 @@ select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000e1
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select validation.case_result('editor-a.identity', 'authenticated/editor-a', current_user || '/' || auth.uid()::text, current_user = 'authenticated' and auth.uid() = '00000000-0000-0000-0000-0000000000e1');
 select validation.case_result('editor-a.read-a', '1', count(*)::text, count(*) = 1) from public.mv_vehiculos where household_id = '10000000-0000-0000-0000-00000000000a';
+select validation.expect_sqlstate('editor-a.select.platform-roles', 'select * from public.mv_platform_roles', '42501');
 select validation.case_result('editor-a.read-b', '0', count(*)::text, count(*) = 0) from public.mv_vehiculos where household_id = '20000000-0000-0000-0000-00000000000b';
 select validation.expect_row_count('editor-a.insert-a', $$insert into public.mv_vehiculos (household_id,marca,modelo,combustible,matricula,anio,kilometros_actuales,estado,fecha_compra,fecha_alta_aplicacion) values ('10000000-0000-0000-0000-00000000000a','X','X','X','EA-1',2020,0,'activo',now(),now())$$, 1);
 select validation.expect_sqlstate('editor-a.insert-b', $$insert into public.mv_vehiculos (household_id,marca,modelo,combustible,matricula,anio,kilometros_actuales,estado,fecha_compra,fecha_alta_aplicacion) values ('20000000-0000-0000-0000-00000000000b','X','X','X','EA-2',2020,0,'activo',now(),now())$$, '42501');
@@ -142,6 +148,7 @@ set local role authenticated;
 select set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000b1', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select validation.case_result('admin-b.identity', 'authenticated/admin-b', current_user || '/' || auth.uid()::text, current_user = 'authenticated' and auth.uid() = '00000000-0000-0000-0000-0000000000b1');
+select validation.expect_sqlstate('admin-b.select.platform-roles', 'select * from public.mv_platform_roles', '42501');
 select validation.case_result('admin-b.read-b', '1', count(*)::text, count(*) = 1) from public.mv_households where id = '20000000-0000-0000-0000-00000000000b';
 select validation.case_result('admin-b.read-a', '0', count(*)::text, count(*) = 0) from public.mv_households where id = '10000000-0000-0000-0000-00000000000a';
 select validation.expect_row_count('admin-b.update-b', $$update public.mv_households set nombre = 'Household B revised' where id = '20000000-0000-0000-0000-00000000000b'$$, 1);

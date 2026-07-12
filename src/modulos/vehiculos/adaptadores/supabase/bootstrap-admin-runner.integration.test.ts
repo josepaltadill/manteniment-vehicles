@@ -15,8 +15,11 @@ const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 // vería como `status: null`, no como un fallo del bootstrap en sí).
 const TIMEOUT_PROCESO_HIJO_MS = 30_000;
 
-function correrRunner(env: Readonly<Record<string, string | undefined>>) {
-  return spawnSync('./node_modules/.bin/tsx', ['scripts/bootstrap-admin.ts'], {
+function correrRunner(
+  env: Readonly<Record<string, string | undefined>>,
+  argumentos: readonly string[] = [],
+) {
+  return spawnSync('./node_modules/.bin/tsx', ['scripts/bootstrap-admin.ts', ...argumentos], {
     cwd: process.cwd(),
     encoding: 'utf8',
     timeout: TIMEOUT_PROCESO_HIJO_MS,
@@ -28,7 +31,33 @@ function correrRunner(env: Readonly<Record<string, string | undefined>>) {
   });
 }
 
-ejecutar('runner de bootstrap administrativo (scripts/bootstrap-admin.ts)', () => {
+describe('contrato de proceso del runner de bootstrap administrativo', () => {
+  it('conserva la siembra histórica por defecto y valida sus variables privadas', () => {
+    const resultado = correrRunner({
+      SUPABASE_BOOTSTRAP_DATABASE_URL: 'postgresql://operator@example.test/postgres',
+      SUPABASE_BOOTSTRAP_EMAIL: '',
+      SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
+      SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Hogar runner incompleto',
+      SUPABASE_BOOTSTRAP_ADMIN_USER_ID: '',
+    });
+
+    expect(resultado.status).not.toBe(0);
+    expect(resultado.stderr).toContain('Falta la variable privada obligatoria SUPABASE_BOOTSTRAP_EMAIL');
+    expect(resultado.stderr).not.toContain('SUPABASE_BOOTSTRAP_ADMIN_USER_ID debe ser un UUID');
+  });
+
+  it('activa el preflight solo con --check y exige su UUID Auth', () => {
+    const resultado = correrRunner(
+      { SUPABASE_BOOTSTRAP_DATABASE_URL: 'postgresql://operator@example.test/postgres' },
+      ['--check'],
+    );
+
+    expect(resultado.status).not.toBe(0);
+    expect(resultado.stderr).toContain('SUPABASE_BOOTSTRAP_ADMIN_USER_ID debe ser un UUID Auth válido');
+  });
+});
+
+ejecutar('integración real del runner de bootstrap administrativo', () => {
   let householdId: string | undefined;
   let userId: string | undefined;
 
