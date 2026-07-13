@@ -66,19 +66,19 @@ Cada PR se fusiona en `main` antes de iniciar el siguiente. No se deben mezclar 
 
 ## PR 2 — Cliente SSR, sesión, login/logout y navegación protegida
 
-**Estado:** bloqueado hasta PR 1 fusionado. **Objetivo de cierre:** existe sesión Supabase SSR por solicitud, login/logout no enumerativos y fronteras de navegación sin carga de datos anónimos.
+**Estado:** apply-ready; PR 1 completado y publicado en `main`. **Objetivo de cierre:** existe sesión Supabase SSR por solicitud, login/logout no enumerativos y fronteras de navegación sin carga de datos anónimos.
 
 **Alcance:** `package.json`/lockfile, `src/compartido/infraestructura/supabase/*`, `src/proxy.ts`, `src/app/login/*`, `src/app/acceso-no-disponible/page.tsx` y sus pruebas.
 
 ### Tareas RED → GREEN → TRIANGULATE → REFACTOR
 
-1. **RED — cliente SSR y entorno.** Añadir pruebas que fallen si no se crea un cliente por solicitud con `@supabase/ssr`, cookies SSR y solo `SUPABASE_URL`/`SUPABASE_ANON_KEY`; prohibir secretos de bootstrap en módulos runtime.
-2. **GREEN — infraestructura SSR.** Añadir `@supabase/ssr`, fábrica server-only por solicitud y separación de configuración runtime/bootstrap en `src/compartido/infraestructura/entorno.ts`.
-3. **RED — login/logout y `next`.** Probar credenciales inválidas con mensaje único, ausencia de contexto parcial, allowlist de destinos relativos y logout que invalida cookies/contexto.
-4. **GREEN — flujo de autenticación.** Implementar página y Server Actions de login/logout con `signInWithPassword`, `auth.getUser()` posterior, cierre de sesión ante fallo de resolución y redirecciones seguras.
-5. **RED — frontera web.** Probar matcher acotado para `/`, `/vehiculos/**` y subrutas; anónimo no debe ejecutar repositorios ni recibir datos `mv_*`.
-6. **GREEN — proxy y estado no disponible.** Implementar refresco de cookies/redirección temprana en `src/proxy.ts`, página de `/acceso-no-disponible` y ruta raíz protegida sin seleccionar familia.
-7. **TRIANGULATE/REFACTOR — sesiones inválidas.** Cubrir token caducado, cookie manipulada y cierre de sesión; revisar que no exista cache global, `getSession()` no autorice y los mensajes no enumeren cuentas/familias.
+- [x] **RED — cliente SSR y entorno.** Añadir pruebas que fallen si no se crea un cliente por solicitud con `@supabase/ssr`, cookies SSR y solo `SUPABASE_URL`/`SUPABASE_ANON_KEY`; prohibir secretos de bootstrap en módulos runtime.
+- [x] **GREEN — infraestructura SSR.** Añadir `@supabase/ssr`, fábrica server-only por solicitud y separación de configuración runtime/bootstrap en `src/compartido/infraestructura/entorno.ts`.
+- [x] **RED — login/logout y `next`.** Probar credenciales inválidas con mensaje único, ausencia de contexto parcial, allowlist de destinos relativos y logout que invalida cookies/contexto.
+- [x] **GREEN — flujo de autenticación.** Implementar página y Server Actions de login/logout con `signInWithPassword`, `auth.getUser()` posterior, cierre de sesión ante fallo de resolución y redirecciones seguras.
+- [x] **RED — frontera web.** Probar matcher acotado para `/`, `/vehiculos/**` y subrutas; anónimo no debe ejecutar repositorios ni recibir datos `mv_*`.
+- [x] **GREEN — proxy y estado no disponible.** Implementar refresco de cookies/redirección temprana en `src/proxy.ts`, página de `/acceso-no-disponible` y ruta raíz protegida sin seleccionar familia.
+- [x] **TRIANGULATE/REFACTOR — sesiones inválidas.** Cubrir token caducado, cookie manipulada y cierre de sesión; revisar que no exista cache global, `getSession()` no autorice y los mensajes no enumeren cuentas/familias.
 
 **Verificación de salida:** `npm test`; `npm run build`; inspección estática de imports server-only y ausencia de `service_role`, header temporal y variables de hogar en runtime.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { leerEntornoSupabase } from './entorno';
+import { leerEntornoRuntimeSupabase, leerEntornoSupabase } from './entorno';
 
 const variablesValidas = () => ({
   SUPABASE_URL: 'https://ejemplo.supabase.co',
@@ -8,6 +8,27 @@ const variablesValidas = () => ({
   SUPABASE_BOOTSTRAP_PASSWORD: 'password-desarrollo-segura',
   SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Hogar de desarrollo',
   SUPABASE_HOUSEHOLD_ID_DESARROLLO: '11111111-1111-4111-8111-111111111111',
+});
+
+describe('leerEntornoRuntimeSupabase', () => {
+  it('solo exige URL y clave anónima, sin secretos de bootstrap ni hogar runtime', () => {
+    expect(
+      leerEntornoRuntimeSupabase({
+        SUPABASE_URL: 'https://ejemplo.supabase.co',
+        SUPABASE_ANON_KEY: 'clave-anonima-de-ejemplo',
+      }),
+    ).toEqual({
+      url: 'https://ejemplo.supabase.co',
+      anonKey: 'clave-anonima-de-ejemplo',
+    });
+  });
+
+  it('ignora variables temporales de bootstrap y hogar que coexisten en process.env', () => {
+    expect(leerEntornoRuntimeSupabase(variablesValidas())).toEqual({
+      url: 'https://ejemplo.supabase.co',
+      anonKey: 'clave-anonima-de-ejemplo',
+    });
+  });
 });
 
 describe('leerEntornoSupabase', () => {

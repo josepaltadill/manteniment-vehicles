@@ -16,6 +16,11 @@ export type EntornoSupabase = Readonly<{
   householdIdDesarrollo: string;
 }>;
 
+const VARIABLES_RUNTIME = [
+  'SUPABASE_URL',
+  'SUPABASE_ANON_KEY',
+] as const;
+
 const VARIABLES_OBLIGATORIAS = [
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
@@ -30,6 +35,16 @@ const VARIABLES_OBLIGATORIAS = [
 // tarde como un "invalid input syntax for type uuid" críptico en la primera
 // consulta real contra Supabase.
 const PATRON_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function leerEntornoRuntimeSupabase(
+  fuente: Record<string, string | undefined> = process.env,
+): Readonly<{ url: string; anonKey: string }> {
+  const valores = Object.fromEntries(
+    VARIABLES_RUNTIME.map((nombre) => [nombre, requerirVariable(fuente, nombre)]),
+  );
+
+  return { url: valores.SUPABASE_URL!, anonKey: valores.SUPABASE_ANON_KEY! };
+}
 
 export function leerEntornoSupabase(
   fuente: Record<string, string | undefined> = process.env,
