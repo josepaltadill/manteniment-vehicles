@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const createServerClient = vi.fn(() => ({ auth: { getUser: vi.fn() } }));
+const createServerClient = vi.fn((..._args: unknown[]) => ({ auth: { getUser: vi.fn() } }));
 
 vi.mock('@supabase/ssr', () => ({
   createServerClient: (...args: unknown[]) => createServerClient(...args),
