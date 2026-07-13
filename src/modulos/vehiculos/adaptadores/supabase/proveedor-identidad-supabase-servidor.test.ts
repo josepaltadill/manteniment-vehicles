@@ -1,81 +1,113 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { crearIdentificador } from '../../../../compartido/dominio/identificador';
+import { establecerReportadorIncidentes } from '../../../../compartido/infraestructura/reporte-incidentes';
+import type { ClienteSupabaseSsr } from '../../../../compartido/infraestructura/supabase/cliente-supabase-ssr';
+import type { ProveedorIdentidad } from '../../aplicacion/puertos/proveedor-identidad';
+import { exigirContextoFamiliar } from '../../aplicacion/servicios/resolver-acceso-familiar';
 import { crearClienteSupabaseFalso } from './pruebas/cliente-supabase-falso';
 import { ProveedorIdentidadSupabaseServidor } from './proveedor-identidad-supabase-servidor';
-import { ErrorAdaptadorSupabase } from './errores-adaptador';
-import type { ClienteSupabaseServidor } from './cliente-supabase-servidor';
 
-// El householdId sembrado se inyecta desde el resultado REAL del bootstrap
-// (`sembrarHogarDeDesarrollo`), nunca como valor arbitrario (diseño §15.7).
-const householdIdSembrado = crearIdentificador('hogar-real-1');
+const redirectMock = vi.fn();
+vi.mock('next/navigation', () => ({ redirect: (...args: unknown[]) => redirectMock(...args) }));
 
-function clienteConUsuarioYMembresia(
-  usuarioId: string | null,
-  membresia: { rol: string } | null,
-): ClienteSupabaseServidor {
-  const { cliente } = crearClienteSupabaseFalso({ data: membresia });
-  const clienteFalso = cliente as unknown as {
-    from: ClienteSupabaseServidor['from'];
-    auth: { getUser: () => Promise<{ data: { user: { id: string } | null }; error: null }> };
+const USUARIO = '11111111-1111-4111-8111-111111111111';
+const HOGAR = '22222222-2222-4222-8222-222222222222';
+function clienteConAcceso(usuarioId: string | null, membresias: unknown, error: unknown = null, errorIdentidad: unknown = null) {
+  const { cliente, llamadas } = crearClienteSupabaseFalso({ data: membresias, error });
+  const clienteSsr = cliente as unknown as ClienteSupabaseSsr;
+  (clienteSsr as unknown as { auth: unknown }).auth = {
+    getUser: async () => ({ data: { user: usuarioId ? { id: usuarioId } : null }, error: errorIdentidad }),
   };
-  clienteFalso.auth = {
-    getUser: async () => ({ data: { user: usuarioId ? { id: usuarioId } : null }, error: null }),
-  };
-  return clienteFalso as unknown as ClienteSupabaseServidor;
+  return { cliente: clienteSsr, llamadas };
 }
 
+const resolver = (cliente: ClienteSupabaseSsr) => new ProveedorIdentidadSupabaseServidor(cliente).resolverAcceso();
+
 describe('ProveedorIdentidadSupabaseServidor', () => {
-  it('resuelve el contexto con el householdId sembrado y el rol admin de la membresía', async () => {
-    const cliente = clienteConUsuarioYMembresia('usuario-real-1', { rol: 'admin' });
-    const proveedor = new ProveedorIdentidadSupabaseServidor(cliente, householdIdSembrado);
-
-    const contexto = await proveedor.obtenerContexto();
-
-    expect(contexto.householdId.valor).toBe('hogar-real-1');
-    expect(contexto.actor.id.valor).toBe('usuario-real-1');
-    expect(contexto.actor.rol).toBe('admin');
+  beforeEach(() => {
+    establecerReportadorIncidentes();
+    redirectMock.mockClear();
   });
 
-  it('resuelve el contexto con rol editor cuando la membresía es editor', async () => {
-    const cliente = clienteConUsuarioYMembresia('usuario-real-2', { rol: 'editor' });
-    const proveedor = new ProveedorIdentidadSupabaseServidor(cliente, householdIdSembrado);
-
-    const contexto = await proveedor.obtenerContexto();
-
-    expect(contexto.actor.rol).toBe('editor');
-  });
-
-  it('rechaza resolver el contexto si el usuario de servidor no tiene membresía en el hogar sembrado', async () => {
-    const cliente = clienteConUsuarioYMembresia('usuario-sin-hogar', null);
-    const proveedor = new ProveedorIdentidadSupabaseServidor(cliente, householdIdSembrado);
-
-    await expect(proveedor.obtenerContexto()).rejects.toThrow(/no tiene membresía/);
-  });
-
-  it('lanza ErrorAdaptadorSupabase con el código Postgres cuando falla la lectura de membresía', async () => {
-    const { cliente } = crearClienteSupabaseFalso({
-      error: { message: 'permission denied for table mv_household_members', code: '42501' },
-    });
-    const clienteFalso = cliente as unknown as {
-      from: ClienteSupabaseServidor['from'];
-      auth: { getUser: () => Promise<{ data: { user: { id: string } | null }; error: null }> };
-    };
-    clienteFalso.auth = {
-      getUser: async () => ({ data: { user: { id: 'usuario-real-1' } }, error: null }),
-    };
-    const proveedor = new ProveedorIdentidadSupabaseServidor(
-      clienteFalso as unknown as ClienteSupabaseServidor,
-      householdIdSembrado,
-    );
-
-    let errorCapturado: unknown;
-    try {
-      await proveedor.obtenerContexto();
-    } catch (error) {
-      errorCapturado = error;
+  it('deniega anonimato y reporta errores de identidad sin consultar membresías', async () => {
+    const reportar = vi.fn();
+    establecerReportadorIncidentes({ reportar });
+    for (const [usuario, error] of [[null, null], [USUARIO, { message: 'auth unavailable' }]] as const) {
+      const { cliente, llamadas } = clienteConAcceso(usuario, [], null, error);
+      await expect(resolver(cliente)).resolves.toEqual({ estado: 'anonimo' });
+      expect(llamadas).toEqual([]);
     }
+    expect(reportar).toHaveBeenCalledOnce();
+    expect(reportar).toHaveBeenCalledWith({
+      contexto: 'resolver-acceso-familiar',
+      error: expect.any(Error),
+      metadatos: { codigo: 'auth_get_user' },
+    });
+  });
 
-    expect(errorCapturado).toBeInstanceOf(ErrorAdaptadorSupabase);
-    expect((errorCapturado as ErrorAdaptadorSupabase).codigo).toBe('42501');
+  it('concede una única membresía y limita la consulta a dos filas', async () => {
+    const { cliente, llamadas } = clienteConAcceso(USUARIO, [{ household_id: HOGAR, rol: 'editor' }]);
+    await expect(resolver(cliente)).resolves.toMatchObject({
+      estado: 'concedido', contexto: { actor: { rol: 'editor' }, householdId: { valor: HOGAR } },
+    });
+    expect(llamadas[0]).toEqual({ tabla: 'mv_household_members', operaciones: [
+      { metodo: 'select', args: ['household_id, rol'] },
+      { metodo: 'eq', args: ['user_id', USUARIO] },
+      { metodo: 'limit', args: [2] },
+    ] });
+  });
+
+  it('falla cerrado para cardinalidad, datos inválidos y errores de persistencia', async () => {
+    const casos = [
+      [[], 'sin-membresia'],
+      [[{ household_id: HOGAR, rol: 'admin' }, { household_id: crypto.randomUUID(), rol: 'editor' }], 'multiples-membresias'],
+      [[{ household_id: 'invalido', rol: 'admin' }], 'datos-invalidos'],
+      [[{ household_id: HOGAR, rol: 'otro' }], 'datos-invalidos'],
+      [[null], 'datos-invalidos'],
+    ] as const;
+    for (const [membresias, motivo] of casos) {
+      await expect(resolver(clienteConAcceso(USUARIO, membresias).cliente)).resolves.toEqual({ estado: 'sin-acceso', motivo });
+    }
+    const reportar = vi.fn();
+    establecerReportadorIncidentes({ reportar });
+    await expect(resolver(clienteConAcceso(USUARIO, [], { message: 'db unavailable', email: 'private@example.test' }).cliente))
+      .resolves.toEqual({ estado: 'sin-acceso', motivo: 'error-operativo' });
+    expect(reportar).toHaveBeenCalledWith({
+      contexto: 'resolver-acceso-familiar',
+      error: expect.any(Error),
+      metadatos: { codigo: 'membership_query' },
+    });
+    expect(JSON.stringify(reportar.mock.calls)).not.toContain('private@example.test');
+    expect(JSON.stringify(reportar.mock.calls)).not.toContain(USUARIO);
+  });
+
+  describe('exigirContextoFamiliar', () => {
+    const contexto = {
+      actor: { id: crearIdentificador(USUARIO), rol: 'admin' as const },
+      householdId: crearIdentificador(HOGAR),
+    };
+    const proveedor = (acceso: Awaited<ReturnType<NonNullable<ProveedorIdentidad['resolverAcceso']>>>) => ({
+      obtenerContexto: vi.fn(),
+      resolverAcceso: vi.fn().mockResolvedValue(acceso),
+    });
+
+    it.each([
+      [{ estado: 'anonimo' } as const, '/login'],
+      [{ estado: 'sin-acceso', motivo: 'sin-membresia' } as const, '/acceso-no-disponible'],
+    ])('redirige el acceso no concedido', async (acceso, destino) => {
+      await exigirContextoFamiliar(proveedor(acceso));
+      expect(redirectMock).toHaveBeenCalledWith(destino);
+    });
+
+    it('devuelve el contexto concedido', async () => {
+      await expect(exigirContextoFamiliar(proveedor({ estado: 'concedido', contexto }))).resolves.toBe(contexto);
+    });
+
+    it('rechaza proveedores que no implementan resolución de acceso', async () => {
+      const sinResolucion: ProveedorIdentidad = { obtenerContexto: vi.fn() };
+      await expect(exigirContextoFamiliar(sinResolucion)).rejects.toThrow(
+        'El proveedor de identidad no puede resolver acceso familiar.',
+      );
+    });
   });
 });

@@ -14,6 +14,12 @@ export type ContextoAplicacion = Readonly<{
   householdId: Identificador;
 }>;
 
+export type AccesoFamiliar =
+  | Readonly<{ estado: 'anonimo' }>
+  | Readonly<{ estado: 'sin-acceso'; motivo: 'sin-membresia' | 'multiples-membresias' | 'datos-invalidos' | 'error-operativo' }>
+  | Readonly<{ estado: 'concedido'; contexto: ContextoAplicacion }>;
+
 export interface ProveedorIdentidad {
   obtenerContexto(): Promise<ContextoAplicacion>;
+  resolverAcceso?(): Promise<AccesoFamiliar>;
 }
