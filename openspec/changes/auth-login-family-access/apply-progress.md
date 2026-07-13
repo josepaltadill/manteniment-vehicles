@@ -204,3 +204,133 @@ Addressed `RELIABILITY-001` / `RESILIENCE-001`, `RELIABILITY-002`, and `RESILIEN
 - Transient identity failures (rate limiting, server/unavailable statuses and retryable transport failures) route to `/acceso-no-disponible`; invalid credentials retain one non-enumerative login error. Defensive sign-out failure does not replace the original unavailable state.
 - RED observed: 6 focused failures for environment/error classification, 1 proxy unavailable-routing failure, and 1 defensive sign-out failure.
 - GREEN: focused auth/runtime suite passed 36 tests; `npm test` passed 315 tests with 15 skipped; `npm run build` passed.
+
+## PR 3 complete — server-side membership resolution and temporary identity removal
+
+### Status / boundary
+
+- Consumed parent status: native `applyState: all_done` is non-authoritative for this execution because PR 3/PR 4 were numbered tasks rather than checkboxes. The PR 3 section in `tasks.md` was the authoritative scope.
+- Delivery: `auto-chain` / `stacked-to-main`; current work unit **PR 3 only**. No PR 4 local activation, documentation, admin UI, family selection, commit, push or PR was created.
+- `actionContext` was not supplied as structured JSON. Warning recorded: edits were limited to the explicitly delegated repository `/home/josep/proyectos/manteniment-vehicles` and its OpenSpec change directory.
+
+### Completed persisted checkboxes
+
+- [x] RED — unión discriminada.
+- [x] GREEN — resolver y proveedor.
+- [x] RED — composición real.
+- [x] GREEN — composición y contexto.
+- [x] RED/GREEN — rutas y aislamiento.
+- [x] TRIANGULATE — RLS A/B.
+- [x] REFACTOR — inventario de entradas.
+
+### Implementation
+
+- `ProveedorIdentidadSupabaseServidor` now validates identity only with `auth.getUser()`, reads `household_id, rol` for that user under RLS, and limits the query to two rows. Only exactly one valid UUID/role membership grants `ContextoAplicacion`; anonymous, zero, multiple, invalid and persistence-failure states fail closed.
+- `exigirContextoFamiliar` translates anonymous access to `/login` and every non-family state to `/acceso-no-disponible` before repositories are composed.
+- Server composition now creates one SSR cookie client per request and shares it between resolver and repositories. It no longer imports bootstrap login, the seeded household, temporary identity or the header token.
+- Root, both previously unguarded vehicle form routes, every data page and every vehicle/event Server Action reach the composition guard. Repositories retain explicit `householdId` arguments.
+
+### Files changed
+
+- `src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.{ts,test.ts}`
+- `src/modulos/vehiculos/aplicacion/{puertos/proveedor-identidad.ts,servicios/resolver-acceso-familiar.ts}`
+- `src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.{ts,test.ts}`
+- `src/compartido/infraestructura/entorno.ts`
+- `src/app/page.tsx`
+- `src/app/vehiculos/{nuevo/page.tsx,[vehiculoId]/eventos/nuevo/page.tsx}`
+- `openspec/changes/auth-login-family-access/{tasks,apply-progress}.md`
+
+### TDD Cycle Evidence
+
+| Task | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|
+| Membership union/provider | `resolverAcceso` absent: 3 focused failures | 3 focused tests pass | anonymous, zero, one, two, invalid UUID/role and DB error; query limited to 2 | discriminated outcome, no raw Supabase error/identity values exposed |
+| Request composition | old header path failed because mocked `headers` was no longer part of the new contract | SSR composition focused test passes | one SSR client is shared with resolver/repositories; protected pages/actions inventory verified | removed token comparison, bootstrap client and temporary provider from runtime composition |
+| App Router boundary | build initially exposed static prerendering of guarded routes without runtime config | `dynamic = 'force-dynamic'` and build pass | root plus all vehicle pages/actions use composition | guard stays centralized and repositories preserve explicit household filters |
+
+### Verification
+
+- RED: `npm test -- src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.test.ts` -> 3 failures (`resolverAcceso is not a function`).
+- RED: `npm test -- src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.test.ts` -> failure on the old `headers`/token path.
+- GREEN: `npm test -- src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.test.ts src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.test.ts` -> 4 passing.
+- Final: `npm test` -> 321 passing, 15 skipped.
+- Final: `npm run build` -> passed; `/`, `/vehiculos`, `/vehiculos/nuevo` and event-new routes are dynamic.
+- Runtime RLS: `./scripts/validate-supabase-rls.sh` -> `SUMMARY|status=PASS|passed=3|failed=0|blocked=0|concurrency=passed`; non-member access and A/B cross-household reads/writes remained denied.
+- Static inventory: runtime sources under `src/app`, vehicle composition and real identity adapter contain no `ProveedorIdentidadTemporal`, `x-vehiculos-access-token`, `VEHICULOS_ACCESS_TOKEN` or `SUPABASE_HOUSEHOLD_ID_DESARROLLO`. Test doubles retain `ProveedorIdentidadTemporal` only for domain unit tests.
+- `git diff --check` -> passed. Source/test implementation is exactly 400 changed lines including the new resolver (OpenSpec artifacts excluded from the review work-unit budget).
+
+### Deviations / risks / remaining work
+
+- No functional design deviation. The root remains its existing protected landing content rather than redirecting to `/vehiculos`; it receives the same authoritative family guard first.
+- The RLS harness validates database A/B isolation with real local roles; it does not exercise a browser cookie/JWT through Next.js end-to-end. Unit coverage verifies the SSR client and resolver contract.
+- No unchecked PR 3 task remains. PR 4 remains the next chained work unit; its numbered tasks are deliberately untouched.
+
+## PR 3 verification-blocker remediation
+
+### Scope and implementation
+
+- The guard-resolved `ContextoAplicacion` is now captured once by server composition and exposed through a request-scoped resolved identity provider. Subsequent use-case calls reuse that exact object and cannot rerun `auth.getUser()` or the membership cardinality query.
+- Composition tests prove denial occurs before repository construction/data access, multiple operations in one request keep one resolution, and extra attacker-controlled actor/household fields cannot override the server household passed to repositories.
+- The real provider test now covers `auth.getUser()` failure and proves no membership query occurs in that state. Existing cases continue to cover anonymous, zero/one/multiple memberships, invalid UUID/role and database failure.
+- `SUPABASE_HOUSEHOLD_ID_DESARROLLO` and `householdIdDesarrollo` were removed from the shared/runtime environment graph and its fixtures. PR 4 activation/scripts/docs remain untouched.
+
+### Strict TDD evidence
+
+- RED: `npm test -- src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.test.ts src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.test.ts src/compartido/infraestructura/entorno.test.ts` exited 1: composition resolved access 3 times instead of 1, the manipulated-authority case resolved twice, and full environment loading still required `SUPABASE_HOUSEHOLD_ID_DESARROLLO`.
+- GREEN/TRIANGULATE: `npm test -- src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.test.ts src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.test.ts src/compartido/infraestructura/entorno.test.ts src/modulos/vehiculos/adaptadores/supabase/cliente-supabase-servidor.test.ts` exited 0; 4 files and 15 tests passed.
+- Final suite: `npm test` exited 0; 44 files passed, 1 skipped; 306 tests passed, 15 skipped.
+- Build: `npm run build` exited 0; TypeScript passed and all private routes remained dynamic.
+- Runtime isolation: `./scripts/validate-supabase-rls.sh` exited 0 with `SUMMARY|status=PASS|passed=3|failed=0|blocked=0|concurrency=passed`.
+- Static checks: `git diff --check` passed. Forbidden identity/token/temporary-household identifiers and `getSession(`/cache patterns produced no matches in the PR 3 runtime graph. Entry inventory confirms every private page/action calls `crearDependenciasVehiculos()` once.
+
+### Files changed by remediation
+
+- `src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.{ts,test.ts}`
+- `src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.test.ts`
+- `src/compartido/infraestructura/entorno.{ts,test.ts}`
+- `src/modulos/vehiculos/adaptadores/supabase/cliente-supabase-servidor.test.ts`
+- `openspec/changes/auth-login-family-access/apply-progress.md`
+
+### Risks / review workload
+
+- PR 3 source/tests now total 466 changed lines (192 additions, 274 deletions), 66 over the preferred 400-line target. The remediation is one inseparable authorization work unit and remains close to the budget; no PR 4 work was pulled in and no `size:exception` was recorded by this agent.
+- The tests exercise the centralized request composition and real membership adapter rather than rendering every App Router page with a browser. Static entry inventory closes the route/action wiring side; the RLS harness closes database cross-household behavior.
+
+## PR 3 review-budget reduction attempt
+
+- Consolidated the membership-provider matrix around shared UUID fixtures and a single resolver helper, and reduced composition-test setup duplication while retaining all 15 focused authorization/runtime tests.
+- Kept the verified authorization behavior intact: one guard resolution/context per request, denial before repository construction, server context precedence over injected authority, and fail-closed identity/membership handling.
+- Budget moved from **474** to **470** source/test changed lines (including the 8-line untracked resolver). The 400-line target remains unresolved: the remaining diff is already dominated by 296 required removals of the temporary identity/runtime contract plus the replacement authorization implementation and behavior tests; further reduction would require minification, dropping essential coverage, or splitting the inseparable PR 3 authorization boundary.
+- Validation: focused suite **15 passed**; `npm test` **306 passed, 15 skipped**; `npm run build` passed; forbidden runtime identity/authority searches returned no matches. RLS was not rerun because no SQL, policy, repository query, or authorization behavior changed; the immediately prior passing A/B harness evidence remains applicable.
+
+## PR 3 budget resolution — corrected split into 3a/3b
+
+The source/test diff could not be reduced under 400 lines without weakening the authorization work unit. The initial split incorrectly assigned the temporary environment cleanup to PR 3a while the PR 3b-owned historical composition still consumed `householdIdDesarrollo`; that boundary made PR 3a fail isolated TypeScript compilation. The corrected split moves the cleanup together with removal of its final consumer:
+
+- **PR 3a — membership resolver and identity contract**: `proveedor-identidad-supabase-servidor*`, `proveedor-identidad.ts`, and `resolver-acceso-familiar.ts`. It deliberately preserves the existing `entorno*` contract and fixture until PR 3b. Exact source/test budget: 82 additions + 116 deletions = **198 changed lines**.
+- **PR 3b — composition, protected entries, and temporary environment cleanup**: root/vehicle private pages, `dependencias-servidor*`, `entorno*`, and the related fixture removal in `cliente-supabase-servidor.test.ts`. Exact source/test budget: 92 additions + 180 deletions = **272 changed lines**.
+
+Both slices keep tests with the behavior they verify and preserve `stacked-to-main`: PR 3a targets `main`, PR 3b targets PR 3a. PR 3a no longer removes a contract consumed by code deferred to PR 3b, so the known split-boundary compilation blocker is resolved by construction. The current workspace still contains the full PR 3 implementation; commit/PR preparation must stage or branch these slices separately and independently validate each resulting tree.
+
+Validation after correcting the split:
+
+- `git diff --numstat` plus the 8-line untracked resolver confirms both proposed code/test slices stay below 400 changed lines.
+- No production or test code changed while correcting the split plan, so no focused test rerun was required.
+- No `size:exception` is required if the corrected split is followed.
+
+## Bounded correction — review-133c1cc5774a23e4
+
+- `RESILIENCE-001`: operational `auth.getUser()` and membership-query failures now invoke the existing incident reporter with stable codes and a synthetic error. Reporter input contains no email, family name, user/household UUID, or raw Supabase error.
+- `RELIABILITY-001`: the centralized server composition test now proves anonymous access redirects to `/login` before either repository is constructed or queried; the non-family redirect remains covered in the same behavior matrix.
+- Strict TDD RED: focused tests failed on two missing incident reports while the anonymous redirect case already passed as triangulation of the existing guard.
+- Strict TDD GREEN: focused provider/composition suite passed 7 tests; full `npm test` passed 307 tests with 15 skipped; `npm run build` passed.
+- `git diff --check` and the forbidden PR 3 runtime identifier scan passed.
+- RLS was not rerun: this correction changes only operational observability and guard coverage, not SQL, policies, membership queries, repository filters, or authorization outcomes.
+
+## Bounded correction — review-82d37e5c4af2767d
+
+- `RELIABILITY-001`: invocation tests now exercise the root, new-vehicle, and new-event pages for anonymous and family-less access. Every case must redirect before returning protected page content or constructing/querying repositories.
+- Page imports use equivalent relative module paths so Vitest can import the App Router entries without changing runtime behavior.
+- RED: the first focused invocation run failed before executing tests because Vitest could not resolve the pages' `@/` imports; after making those imports directly testable, the cases exposed the missing runtime-environment fixture.
+- GREEN/TRIANGULATE: the focused composition/page suite passed 10 tests across both denial outcomes; `npm test` passed 317 tests with 15 skipped; `git diff --check` passed.
+- `npm run build` was not run because it writes generated `.next` output outside this correction's exact allowed edit surfaces.

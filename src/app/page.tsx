@@ -1,4 +1,10 @@
-export default function PaginaInicio() {
+import { crearDependenciasVehiculos } from '../modulos/vehiculos/interfaz/composicion/dependencias-servidor';
+
+export const dynamic = 'force-dynamic';
+
+export default async function PaginaInicio() {
+  await crearDependenciasVehiculos();
+
   return (
     <main className="mx-auto flex min-h-screen max-w-3xl flex-col justify-center px-6 py-12">
       <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Mantenimiento familiar</p>

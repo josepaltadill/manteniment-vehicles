@@ -17,7 +17,6 @@ const entornoValido: EntornoSupabase = {
   bootstrapEmail: 'admin-desarrollo@ejemplo.local',
   bootstrapPassword: 'password-desarrollo-segura',
   bootstrapHouseholdNombre: 'Hogar de desarrollo',
-  householdIdDesarrollo: '11111111-1111-4111-8111-111111111111',
 };
 
 describe('crearClienteSupabaseServidor', () => {

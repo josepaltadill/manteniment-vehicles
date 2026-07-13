@@ -30,11 +30,12 @@ Chain strategy: stacked-to-main
 ```text
 PR 1 migración/RLS + bootstrap seguro (inerte y verificable)
   → PR 2 cliente SSR + sesión, login/logout y guardas
-    → PR 3 resolución de membresía + composición/rutas protegidas
-      → PR 4 activación productiva, desarrollo local y documentación operativa
+    → PR 3a resolución de membresía server-side y contrato de identidad
+      → PR 3b composición real y rutas/actions protegidas
+        → PR 4 activación productiva, desarrollo local y documentación operativa
 ```
 
-Cada PR se fusiona en `main` antes de iniciar el siguiente. No se deben mezclar estrategias de ramas. El PR actual de cada corte debe marcarse con `📍` en su diagrama de dependencia.
+Cada PR se fusiona en `main` antes de iniciar el siguiente. No se deben mezclar estrategias de ramas. El PR actual de cada corte debe marcarse con `📍` en su diagrama de dependencia. El PR 3 se divide en 3a/3b para mantener cada revisión bajo el presupuesto de 400 líneas sin degradar la cobertura de autorización.
 
 ---
 
@@ -92,19 +93,23 @@ Cada PR se fusiona en `main` antes de iniciar el siguiente. No se deben mezclar 
 
 ## PR 3 — Resolución server-side de membresía y sustitución de identidad temporal
 
-**Estado:** bloqueado hasta PR 2 fusionado. **Objetivo de cierre:** toda solicitud/acción familiar obtiene un único `ContextoAplicacion` desde `auth.getUser()` y membresías bajo RLS, o falla cerrado.
+**Estado:** dividido en PR 3a/3b por presupuesto de revisión. **Objetivo de cierre:** toda solicitud/acción familiar obtiene un único `ContextoAplicacion` desde `auth.getUser()` y membresías bajo RLS, o falla cerrado.
 
-**Alcance:** `src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.ts`, `src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.ts`, servicio/puerto de resolución de acceso, `src/app/page.tsx`, `src/app/vehiculos/**` y pruebas unitarias/integración.
+**Split de revisión:**
+- **PR 3a:** resolver/proveedor de membresía server-side y contrato de identidad. Conserva temporalmente `householdIdDesarrollo` porque la composición histórica todavía lo consume. Presupuesto exacto código/tests: 198 líneas.
+- **PR 3b:** composición real, reutilización de contexto único en páginas/actions privadas, inventario de entradas protegidas y limpieza coordinada de `entorno*`/fixtures temporales cuando desaparece su último consumidor. Presupuesto exacto código/tests: 272 líneas.
+
+**Alcance:** `src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.ts`, `src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.ts`, servicio/puerto de resolución de acceso, `src/compartido/infraestructura/entorno*`, el fixture relacionado de `cliente-supabase-servidor.test.ts`, `src/app/page.tsx`, `src/app/vehiculos/**` y pruebas unitarias/integración.
 
 ### Tareas RED → GREEN → TRIANGULATE → REFACTOR
 
-1. **RED — unión discriminada.** Probar `anonimo`, `sin-acceso/sin-membresia`, `sin-acceso/multiples-membresias` y `concedido`, incluyendo error de DB, UUID/rol inválido y consulta limitada a dos filas.
-2. **GREEN — resolver y proveedor.** Implementar `resolverAccesoFamiliar`/`exigirContextoFamiliar` y adaptar el proveedor para usar `getUser()`, consultar membresías propias bajo RLS y exigir cardinalidad exactamente uno.
-3. **RED — composición real.** Probar que se elimina el usuario técnico, el header `x-vehiculos-access-token` y el hogar sembrado; el mismo cliente autenticado por solicitud llega al resolver y repositorios.
-4. **GREEN — composición y contexto.** Rehacer `dependencias-servidor.ts`; conservar `householdId` explícito en casos de uso/repositorios y aplicar la guarda antes de cada página y Server Action privada.
-5. **RED/GREEN — rutas y aislamiento.** Cubrir miembro válido de `Familia Altadill`, usuario sin familia, múltiples membresías, sesión caducada y manipulación de URL/form/cookie/header; verificar que nunca se usa un `household_id` del cliente.
-6. **TRIANGULATE — RLS A/B.** Ejecutar lecturas/escrituras con usuarios de familias distintas y confirmar doble defensa: filtro explícito por contexto y RLS bloqueando cruces.
-7. **REFACTOR — inventario de entradas.** Auditar todas las rutas y actions bajo `src/app/vehiculos/**`, eliminar restos de identidad temporal y normalizar errores/observabilidad sin email, nombres familiares ni UUID completos.
+- [x] **RED — unión discriminada.** Probar `anonimo`, `sin-acceso/sin-membresia`, `sin-acceso/multiples-membresias` y `concedido`, incluyendo error de DB, UUID/rol inválido y consulta limitada a dos filas.
+- [x] **GREEN — resolver y proveedor.** Implementar `resolverAccesoFamiliar`/`exigirContextoFamiliar` y adaptar el proveedor para usar `getUser()`, consultar membresías propias bajo RLS y exigir cardinalidad exactamente uno.
+- [x] **RED — composición real.** Probar que se elimina el usuario técnico, el header `x-vehiculos-access-token` y el hogar sembrado; el mismo cliente autenticado por solicitud llega al resolver y repositorios.
+- [x] **GREEN — composición y contexto.** Rehacer `dependencias-servidor.ts`; conservar `householdId` explícito en casos de uso/repositorios y aplicar la guarda antes de cada página y Server Action privada.
+- [x] **RED/GREEN — rutas y aislamiento.** Cubrir miembro válido de `Familia Altadill`, usuario sin familia, múltiples membresías, sesión caducada y manipulación de URL/form/cookie/header; verificar que nunca se usa un `household_id` del cliente.
+- [x] **TRIANGULATE — RLS A/B.** Ejecutar lecturas/escrituras con usuarios de familias distintas y confirmar doble defensa: filtro explícito por contexto y RLS bloqueando cruces.
+- [x] **REFACTOR — inventario de entradas.** Auditar todas las rutas y actions bajo `src/app/vehiculos/**`, eliminar restos de identidad temporal y normalizar errores/observabilidad sin email, nombres familiares ni UUID completos.
 
 **Verificación de salida:** `npm test`; `npm run build`; pruebas de integración App Router y assertions RLS con JWTs reales/locales.
 
