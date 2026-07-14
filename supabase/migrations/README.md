@@ -294,13 +294,15 @@ SUPABASE_BOOTSTRAP_DATABASE_URL=... \
 SUPABASE_BOOTSTRAP_EMAIL=... \
 SUPABASE_BOOTSTRAP_PASSWORD=... \
 SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE=... \
-npm run bootstrap:admin
+npm run bootstrap:admin -- --seed-local
 ```
 
 Nunca desde server actions, componentes React ni el cliente Supabase de la
-aplicación. El script reporta `householdId`/`userId` sembrados y sale con
-código 0 en éxito; falla con código distinto de 0 y un mensaje explícito en
-stderr si falta alguna variable privada o si la siembra falla.
+aplicación. La siembra local requiere siempre `--seed-local`; sin esa bandera,
+`npm run bootstrap:admin` ejecuta preflight productivo no mutante y exige un UUID
+Auth. El script reporta `householdId`/`userId` sembrados y sale con código 0 en
+éxito; falla con código distinto de 0 y un mensaje explícito en stderr si falta
+alguna variable privada o si la siembra falla.
 
 El presupuesto de conexión (timeout, reintentos, backoff) tiene valores por
 defecto pensados para una base ya despierta (5s de timeout, 3 intentos), que
@@ -311,7 +313,7 @@ tocar código vía variables opcionales:
 SUPABASE_BOOTSTRAP_CONNECT_TIMEOUT_MS=20000 \
 SUPABASE_BOOTSTRAP_CONNECT_RETRIES=5 \
 SUPABASE_BOOTSTRAP_CONNECT_BACKOFF_MS=500 \
-npm run bootstrap:admin
+npm run bootstrap:admin -- --seed-local
 ```
 
 Sin definirlas, se usan los valores por defecto. Un valor no numérico o no
@@ -323,53 +325,72 @@ Si el usuario/hogar sembrados ya tienen una membresía con un rol distinto de
 requiere resolución manual. Reejecutar el bootstrap nunca debe revertir en
 silencio una decisión de rol tomada fuera de él.
 
-## Entorno local: de cero a `npm run dev`
+## Entorno local: login manual
 
-Levantar la app localmente contra Supabase real implica varios pasos que antes
-estaban repartidos entre este archivo, `entorno.ts` y
-`dependencias-servidor.ts`. La forma más corta es un solo comando:
+El único atajo soportado para desarrollo local es:
 
 ```sh
 npm run dev:local
 ```
 
-Esto (`scripts/dev-local.sh`): levanta el stack local de Supabase si no está
-corriendo, siembra (o reutiliza, es idempotente) un hogar/usuario de
-desarrollo vía `npm run bootstrap:admin`, y arranca `next dev` con las
-variables de entorno ya resueltas — incluyendo `SUPABASE_HOUSEHOLD_ID_DESARROLLO`,
-extraído automáticamente de la salida del bootstrap. Usa valores por defecto
-razonables (`dev@ejemplo.local`, `Hogar de desarrollo`,
-`token-desarrollo-local`); sobreescribibles seteando
-`SUPABASE_BOOTSTRAP_EMAIL`/`_PASSWORD`/`_HOUSEHOLD_NOMBRE`/`VEHICULOS_ACCESS_TOKEN`
-antes de invocarlo.
+El script levanta Supabase local si hace falta, siembra o reutiliza la cuenta local con
+`npm run bootstrap:admin -- --seed-local` y arranca Next directamente en
+`127.0.0.1:3000`. Muestra la URL `http://127.0.0.1:3000/login` y el email local, pero
+nunca la contraseña. Iniciá sesión manualmente: el runtime solo recibe `SUPABASE_URL` y
+`SUPABASE_ANON_KEY`; no recibe identidad, hogar ni cabeceras de bypass.
 
-Para QA manual, después de ejecutar `npm run dev:local`, abrir
-`http://127.0.0.1:3000/vehiculos` en un navegador normal. El script arranca Next en
-`127.0.0.1:3001` y un proxy HTTP propio en `127.0.0.1:3000`; ambos quedan ligados
-exclusivamente a loopback. El proxy inyecta en cada request el header
-`x-vehiculos-access-token` con `VEHICULOS_ACCESS_TOKEN`, sin mostrar el valor en
-logs. También reenvía upgrades WebSocket para el HMR de Next.
+Las credenciales `SUPABASE_BOOTSTRAP_*` pertenecen únicamente al proceso de siembra
+local. Por defecto el script reutiliza `Hogar de desarrollo`, un hogar intencionalmente
+local y distinto del objetivo productivo. `SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE` es un
+override exclusivo del entorno local: usarlo solo para elegir un hogar de pruebas
+conocido; no configura ni activa `Familia Altadill` en producción. El runner
+administrativo exige `--seed-local` para esa siembra; sin esa bandera ejecuta solo el
+preflight productivo `--check` y no muta datos.
 
-No existe un bypass de aplicación para desarrollo local: el guard de servidor
-siempre exige el token correcto. Fuera del proxy local —incluidos producción y
-servidores no locales— cada cliente HTTP debe mandar ese mismo header.
+## Activación productiva de Familia Altadill
 
-Si se prefiere correr los pasos a mano (o entender qué hace el script), son,
-en orden:
+Este procedimiento separa preparación, despliegue y activación. No ejecutar pasos de
+mutación ni apuntar los comandos a un entorno compartido sin autorización operativa.
 
-1. `supabase start` (o `supabase db reset` para reaplicar migraciones desde
-   cero) — levanta Postgres/Auth/etc. locales.
-2. `npm run bootstrap:admin` con `SUPABASE_BOOTSTRAP_DATABASE_URL`/`_EMAIL`/
-   `_PASSWORD`/`_HOUSEHOLD_NOMBRE` (ver sección de arriba) — siembra el primer
-   admin y devuelve `householdId`/`userId` reales.
-3. Setear las 6 variables de `EntornoSupabase` para `next dev`: `SUPABASE_URL`,
-   `SUPABASE_ANON_KEY` (ambas de `supabase status -o env`),
-   `SUPABASE_BOOTSTRAP_EMAIL`/`_PASSWORD`/`_HOUSEHOLD_NOMBRE` (las mismas del
-   paso 2) y `SUPABASE_HOUSEHOLD_ID_DESARROLLO` (el `householdId` real que
-   imprimió el paso 2).
-4. Setear `VEHICULOS_ACCESS_TOKEN`. Para reproducir manualmente el flujo del
-   navegador también hace falta un proxy ligado a loopback que inyecte
-   `x-vehiculos-access-token`; `scripts/dev-local.sh` contiene la implementación
-   soportada. Sin ese proxy, cada request a `/vehiculos` debe mandar el header.
+### 1. Preparación y backup
 
-Ver `.env.local.example` para una plantilla copiable de las 7 variables.
+1. Registrar un backup restaurable, comprobar su retención y ensayar restauración en un
+   entorno aislado.
+2. Registrar el UUID Auth verificado del administrador y los conteos previos de
+   vehículos/eventos del hogar candidato.
+3. Ejecutar únicamente el preflight y conservar su JSON:
+
+   ```sh
+   SUPABASE_BOOTSTRAP_DATABASE_URL=... \
+   SUPABASE_BOOTSTRAP_ADMIN_USER_ID=<uuid-auth-verificado> \
+   npm run bootstrap:admin -- --check
+   ```
+
+4. Detenerse ante cualquier `conflicto`. El preflight no reasigna, promociona, borra ni
+   renombra datos. Si hay un renombrado autorizado, registrar el UUID original y los
+   conteos antes de preparar el plan explícito.
+
+### 2. Despliegue cerrado y smoke
+
+1. Aplicar solo migraciones revisadas y comprobar RLS/grants con
+   `./scripts/validate-supabase-rls.sh` en un entorno local o efímero.
+2. Desplegar el código con el acceso aún cerrado cuando la plataforma lo permita.
+3. Ejecutar smoke manual: abrir `/login`, iniciar sesión con un miembro válido, confirmar
+   acceso a su panel, cerrar sesión y confirmar que una ruta privada vuelve a `/login`.
+4. Confirmar que el UUID de hogar y los conteos previos no cambiaron. Un fallo de
+   despliegue deja el acceso cerrado; no habilitar una autorización incierta.
+
+### 3. Activación y recuperación
+
+1. Activar solo después de guardar evidencia de backup, plan, UUID, conteos, RLS y smoke. La activación es un gate de despliegue controlado por el operador; `--apply --confirm` no la ejecuta ni muta datos en este PR.
+2. Durante la ventana, monitorizar denegaciones RLS, errores de autenticación y cualquier
+   señal de cruce familiar sin registrar emails, nombres familiares ni UUID completos.
+3. Ante conflicto de preflight, fallo de despliegue o sospecha de cruce: congelar
+   escrituras/acceso, revocar sesiones, preservar evidencia y aplicar fix-forward o
+   rollback verificado.
+4. Un rollback de código no borra automáticamente familias, membresías ni roles válidos.
+   La migración aditiva permanece inerte; un renombrado solo se revierte mediante una
+   transacción explícita revisada con el estado previo registrado.
+
+La separación futura entre plataforma y familia se mantiene: un rol de plataforma no
+activa un panel ni sustituye la membresía familiar en este corte.

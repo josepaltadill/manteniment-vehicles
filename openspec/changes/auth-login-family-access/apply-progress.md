@@ -334,3 +334,130 @@ Validation after correcting the split:
 - RED: the first focused invocation run failed before executing tests because Vitest could not resolve the pages' `@/` imports; after making those imports directly testable, the cases exposed the missing runtime-environment fixture.
 - GREEN/TRIANGULATE: the focused composition/page suite passed 10 tests across both denial outcomes; `npm test` passed 317 tests with 15 skipped; `git diff --check` passed.
 - `npm run build` was not run because it writes generated `.next` output outside this correction's exact allowed edit surfaces.
+
+## PR 4 — activación local y procedimiento operativo (parcial)
+
+### Estado / boundary
+
+- Estado nativo autoritativo consumido: `applyState: ready`, `nextRecommended: apply`, `blockedReasons: []`, `actionContext.mode: repo-local`, con `/home/josep/proyectos/manteniment-vehicles` como workspace y único `allowedEditRoot`.
+- Entrega: `auto-chain` / `stacked-to-main`; se aplicó exclusivamente PR 4. No hubo commit, push, PR, revisión, ni mutación de servicios externos o producción.
+
+### Trabajo completado y casillas persistidas
+
+- [x] RED/GREEN del contrato local: `dev-local.sh` ya no exporta hogar/token temporales ni inyecta cabeceras; arranca Next directamente en `127.0.0.1:3000`, muestra URL/email y nunca imprime la contraseña.
+- [x] Bootstrap local explícito: `--seed-local` reserva la siembra histórica al entorno local; sin flags el runner ejecuta preflight no mutante y exige UUID Auth.
+- [x] Procedimiento operativo: la guía separa backup/preflight, despliegue cerrado/smoke y activación/recuperación para `Familia Altadill`.
+- [x] TRIANGULATE: los contratos de plan/preflight y runner cubren conflictos y bloquean modos productivos sin autorización; la guía exige congelar acceso/escrituras, revocar sesiones y rollback/fix-forward sin borrar membresías válidas.
+- [x] REFACTOR: la guarda estática rechaza `SUPABASE_HOUSEHOLD_ID_DESARROLLO`, `VEHICULOS_ACCESS_TOKEN` y `SUPABASE_SERVICE_ROLE_KEY` en el grafo runtime; se conserva la allowlist de imports bootstrap y `server-only`.
+
+### Archivos cambiados
+
+- `scripts/dev-local.sh`
+- `scripts/bootstrap-admin.ts`
+- `src/compartido/pruebas/dev-local.test.ts`
+- `src/modulos/vehiculos/adaptadores/supabase/{bootstrap-cli,bootstrap-cli.test,bootstrap-admin-runner.integration.test,seguridad-servidor,seguridad-servidor.test}.ts`
+- `supabase/migrations/README.md`
+- `openspec/changes/auth-login-family-access/{tasks,apply-progress}.md`
+
+### TDD Cycle Evidence
+
+| Task | Safety net / RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|
+| Local seguro | 17 guard tests passed; new script contract failed (2 assertions: token/hogar/proxy and seed-local absent) | focused local + CLI tests: 7 passing | runner explicitly distinguishes `--seed-local` from default preflight | direct loopback process, no proxy/secret output |
+| Procedimiento / recuperación | new documentation contract failed (missing activation headings) | document contract: 3 passing | bootstrap plan + runner: 9 passing, 3 integration skips | short staged guide with explicit rollback/freeze/revoke steps |
+| Gate estático | 17 guard tests passed; 2 new tests failed because detector was absent | security + local + CLI focused suite: 27 passing | runtime graph and synthetic forbidden identifiers checked | shared forbidden-identifier detector; existing import allowlist retained |
+
+### Verificación
+
+- Focused: `npm test -- src/modulos/vehiculos/adaptadores/supabase/bootstrap-admin-runner.integration.test.ts src/modulos/vehiculos/adaptadores/supabase/bootstrap-cli.test.ts src/compartido/pruebas/dev-local.test.ts src/modulos/vehiculos/adaptadores/supabase/seguridad-servidor.test.ts` → 30 passing, 3 skipped.
+- Recovery/plan: `npm test -- src/modulos/vehiculos/adaptadores/supabase/bootstrap-plan.test.ts src/modulos/vehiculos/adaptadores/supabase/bootstrap-admin-runner.integration.test.ts` → 9 passing, 3 skipped.
+- Final automated: `npm test` → 324 passing, 15 skipped; `npm run build` → passed.
+- Local RLS: `./scripts/validate-supabase-rls.sh` → `SUMMARY|status=PASS|passed=3|failed=0|blocked=0|concurrency=passed`; ephemeral owned runtime was stopped and removed.
+- Static: `bash -n scripts/dev-local.sh`, `git diff --check`, and forbidden-runtime `rg` scan passed.
+
+### Remaining blocker
+
+- [ ] **Gate final.** Falta smoke manual de login/logout y conservar evidencia operativa real de backup, plan, UUID y conteos antes/después. No se ejecutó porque requiere un operador autorizado y datos/credenciales locales o productivos reales; este apply no mutó ningún servicio externo.
+
+### Workload / risks
+
+- PR 4 diff actual: 151 additions + 148 deletions in tracked files, más 39 líneas de test nuevo; dentro del presupuesto de 400 líneas.
+- No hay desviación de diseño. El `--apply --confirm` productivo sigue deliberadamente bloqueado: evita mutaciones automáticas hasta que un operador ejecute un plan transaccional revisado.
+- Siguiente paso: el padre debe coordinar el smoke manual y recopilar su evidencia antes de marcar el Gate final y pasar a lifecycle/verify.
+
+## PR 4 — remediación del gate local manual
+
+### Estado consumido
+
+- Estado nativo autoritativo: `applyState: ready`, `nextRecommended: apply`, sin bloqueos; `actionContext.mode: repo-local`, `workspaceRoot` y único `allowedEditRoot`: `/home/josep/proyectos/manteniment-vehicles`.
+- Entrega: `auto-chain` / `stacked-to-main`; este ajuste permanece dentro del corte PR 4. No hubo commit, push, PR, revisión, ni acceso a producción o servicios externos.
+
+### Remediación completada
+
+- `scripts/dev-local.sh` vuelve a usar `Hogar de desarrollo` como valor predeterminado de `SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE`; `Familia Altadill` continúa siendo únicamente el objetivo del preflight/plan productivo.
+- La guía deja explícito que `SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE` es un override exclusivo de la siembra local y no activa ni configura producción.
+- El contrato de `dev-local` cubre el valor local predeterminado, el override documentado y la ausencia de bypass/contraseña impresa.
+
+### Verificación
+
+- Safety net: `npm test -- src/compartido/pruebas/dev-local.test.ts src/modulos/vehiculos/adaptadores/supabase/bootstrap-admin-runner.integration.test.ts src/modulos/vehiculos/adaptadores/supabase/bootstrap-cli.test.ts` → 11 passing, 3 skipped.
+- RED: el nuevo contrato falló porque el script sembraba `Familia Altadill` por defecto.
+- GREEN/TRIANGULATE: `npm test -- src/compartido/pruebas/dev-local.test.ts` → 4 passing.
+- Focused final: `npm test -- src/compartido/pruebas/dev-local.test.ts src/modulos/vehiculos/adaptadores/supabase/bootstrap-admin-runner.integration.test.ts src/modulos/vehiculos/adaptadores/supabase/bootstrap-cli.test.ts src/modulos/vehiculos/adaptadores/supabase/seguridad-servidor.test.ts` → 31 passing, 3 skipped.
+- `npm test` → 325 passing, 15 skipped; `npm run build` → passed.
+- `./scripts/validate-supabase-rls.sh` → `SUMMARY|status=PASS|passed=3|failed=0|blocked=0|concurrency=passed`; el runtime efímero fue eliminado.
+- `bash -n scripts/dev-local.sh`, `git diff --check` y la búsqueda de identificadores/header temporales en `scripts/dev-local.sh` → passed.
+- Evidencia manual local reutilizada: el smoke user local inició sesión y llegó a `/vehiculos`; logout redirigió a `/login` y `/vehiculos` posterior redirigió al login. El preflight local para `Familia Altadill` devolvió un plan sin mutación y los conteos del smoke user se conservaron (una membresía, 0 vehículos, 0 eventos).
+
+### TDD Cycle Evidence
+
+| Task | Test file/layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|
+| Default local seed household | `src/compartido/pruebas/dev-local.test.ts` / unit | 11 passing, 3 skipped | Default `Familia Altadill` failed the new contract | 4 tests passed after restoring `Hogar de desarrollo` | Script default plus documented local-only override | No additional refactor required |
+
+### Gate final
+
+- [x] **Gate final completado localmente.** `npm test`, `npm run build`, validación RLS local y smoke manual de login/logout tienen evidencia registrada.
+- Smoke manual local: con el usuario local `smoke-pr4@ejemplo.local`, el login vía Server Action redirigió a `/vehiculos` y cargó contenido protegido (`Vehículos`, lista vacía); la acción de logout redirigió a `/login`; una visita posterior a `/vehiculos` redirigió nuevamente a login.
+- Evidencia de plan/UUID/conteos: usuario local `f62615a8-8e54-42a0-b0c4-66c64169acb7`, hogar local `a77c85cd-153d-4d16-9a52-d9ebe5a7a817`, una membresía `admin`, 0 vehículos y 0 eventos para el smoke user; el preflight local de `Familia Altadill` produjo un plan JSON sin mutación.
+- Evidencia de backup/restore local: `pg_dump` desde el contenedor Postgres 17 a `/tmp/pr4_restore_20260714190944_app.sql`; restore rehearsal PASS en base aislada `pr4_restore_20260714190944`, conteos restaurados `households=3`, `memberships=3`, `vehicles=1`, `events=2`, y la base de ensayo fue eliminada.
+- No se borraron ni mutaron automáticamente los datos locales ya existentes con múltiples membresías; quien ya tenga ese estado debe resolverlo explícitamente. Las ejecuciones futuras por defecto no sembrarán `Familia Altadill`.
+
+### Archivos modificados en esta remediación
+
+- `scripts/dev-local.sh`
+- `src/compartido/pruebas/dev-local.test.ts`
+- `supabase/migrations/README.md`
+- `openspec/changes/auth-login-family-access/apply-progress.md`
+
+## Bounded correction — review-cf12248c4bbd7333
+
+### Status / boundary
+
+- Structured native status consumed: `artifactStore: openspec`, `applyState: all_done`, `nextRecommended: resolve-review`; its `actionContext` authorizes edits under `/home/josep/proyectos/manteniment-vehicles` only. This was a parent-delegated correction to the current PR 4 diff, not a new apply batch, commit, push, PR, review, or external-service operation.
+- Delivery boundary remains PR 4 / `auto-chain` / `stacked-to-main`. No production or external service was contacted.
+
+### Corrections completed
+
+- `RISK-001` / `RESILIENCE-001` / `READABILITY-001` / `RELIABILITY-001`: `scripts/bootstrap-admin.ts` now calls `leerSolicitudBootstrap` once at the entrypoint and dispatches on `solicitud.modo`. Mixed `--seed-local --apply` and `--seed-local --desconocido` fail during parsing, before the historical seeder can read credentials or mutate.
+- `RELIABILITY-002`: real runner integration cases now pass `--seed-local` for the historical seed. The no-argument case remains preflight; seed failure and secret-redaction cases explicitly exercise seed-local mode.
+- `READABILITY-002` / `READABILITY-003`: the migration guide no longer presents bare `npm run bootstrap:admin` as a seed command. It states that `--seed-local` is required for local seeding, and that activation is an operator-controlled deployment gate; `--apply --confirm` remains deliberately blocked and non-mutating in this PR.
+- `RELIABILITY-004`: the forbidden runtime identifier scan now includes `src/proxy.ts`.
+
+### Verification and Strict TDD evidence
+
+- Safety net: focused bootstrap CLI/runner, local-development, and security suite → 31 passed, 3 skipped.
+- RED: new runner process cases failed because `--seed-local` short-circuited parsing and reached the historical seeder; new documentation assertions failed because the guide lacked the operator-controlled activation statement.
+- GREEN/TRIANGULATE: `npm test -- src/modulos/vehiculos/adaptadores/supabase/bootstrap-admin-runner.integration.test.ts src/modulos/vehiculos/adaptadores/supabase/bootstrap-cli.test.ts src/compartido/pruebas/dev-local.test.ts src/modulos/vehiculos/adaptadores/supabase/seguridad-servidor.test.ts` → 33 passed, 3 skipped. The two runner variants cover mixed recognized and unknown arguments; seed-local integration paths cover success/failure/redaction separately.
+- Final: `npm test` → 327 passed, 15 skipped; `npm run build` → passed; `git diff --check` → passed. The stale bare-command scan in `supabase/migrations/README.md` returned no matches.
+
+| Task | Test file/layer | Safety net | RED | GREEN | TRIANGULATE | REFACTOR |
+|---|---|---|---|---|---|---|
+| Runner parse-before-seed | `bootstrap-admin-runner.integration.test.ts` / process integration | 31 passed, 3 skipped | mixed seed/apply and seed/unknown cases failed before code change | 33 passed, 3 skipped | recognized and unknown mixed arguments both fail before seed credentials | Entry point parses once and branches on typed mode |
+| Local/operator documentation | `dev-local.test.ts` / documentation contract | included above | missing deployment-gate wording failed | focused suite passed | no bare seed command and blocked apply contract both asserted | stale examples corrected |
+| Runtime forbidden scan | `seguridad-servidor.test.ts` / static unit | included above | N/A: scan-scope extension only | focused suite passed | existing runtime graph remains clean with proxy included | no refactor needed |
+
+### Gate, task persistence, and remaining work
+
+- No task checkbox changed in this correction: all PR 4 implementation rows, including **Gate final**, were already visibly `[x]`. The parent-provided local smoke and backup/restore evidence remains applicable; this correction did not mutate it or invalidate that completion.
+- No design deviation. Remaining lifecycle actions are parent-owned: review/verification resolution and any delivery action; `sdd-apply` does not create or approve review receipts.

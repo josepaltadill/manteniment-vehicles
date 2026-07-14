@@ -5,8 +5,7 @@ import {
   leerOpcionesConexionBootstrapDesdeEntorno,
 } from '../src/modulos/vehiculos/adaptadores/supabase/operaciones-bootstrap-postgres';
 
-async function ejecutarPreflight(): Promise<void> {
-  const solicitud = leerSolicitudBootstrap(process.argv.slice(2), process.env);
+async function ejecutarPreflight(solicitud: ReturnType<typeof leerSolicitudBootstrap>): Promise<void> {
   const databaseUrl = process.env.SUPABASE_BOOTSTRAP_DATABASE_URL;
   if (!databaseUrl?.trim()) throw new Error('Falta la variable privada obligatoria SUPABASE_BOOTSTRAP_DATABASE_URL.');
 
@@ -38,8 +37,12 @@ async function ejecutarSiembraHistorica(): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const preflightSolicitado = process.argv.slice(2).some((argumento) => argumento === '--check' || argumento === '--apply');
-  await (preflightSolicitado ? ejecutarPreflight() : ejecutarSiembraHistorica());
+  const solicitud = leerSolicitudBootstrap(process.argv.slice(2), process.env);
+  if (solicitud.modo === 'seed-local') {
+    await ejecutarSiembraHistorica();
+    return;
+  }
+  await ejecutarPreflight(solicitud);
 }
 
 main()

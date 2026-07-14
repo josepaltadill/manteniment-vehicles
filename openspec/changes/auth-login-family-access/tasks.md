@@ -129,12 +129,12 @@ Cada PR se fusiona en `main` antes de iniciar el siguiente. No se deben mezclar 
 
 ### Tareas RED → GREEN → TRIANGULATE → REFACTOR
 
-1. **RED — contrato de entorno local.** Probar que `dev-local.sh` no exporta `SUPABASE_HOUSEHOLD_ID_DESARROLLO` ni `VEHICULOS_ACCESS_TOKEN`, no inyecta headers y conserva credenciales solo para sembrar login local.
-2. **GREEN — arranque local seguro.** Actualizar el script para arrancar Next directamente en loopback, imprimir URL/email de login sin contraseña por defecto y separar bootstrap de runtime.
-3. **RED/GREEN — procedimiento productivo.** Documentar y automatizar solo las comprobaciones necesarias para backup, `--check`, aplicación autorizada, verificación de UUID/conteos, despliegue cerrado, smoke y activación.
-4. **TRIANGULATE — fallo y recuperación.** Simular conflicto de preflight, fallo de despliegue y rollback; comprobar que no se amplía acceso, no se borran/reasignan datos y las membresías válidas no se eliminan automáticamente.
-5. **REFACTOR — gate de seguridad.** Añadir búsquedas/tests que fallen ante secretos administrativos o nombres temporales en el grafo runtime y validar allowlist de imports bootstrap server-only.
-6. **Gate final.** Ejecutar `npm test`, `npm run build`, validación RLS local completa y smoke manual de login/logout; conservar evidencia de backup, plan, UUID y conteos antes/después.
+- [x] **RED — contrato de entorno local.** Probar que `dev-local.sh` no exporta `SUPABASE_HOUSEHOLD_ID_DESARROLLO` ni `VEHICULOS_ACCESS_TOKEN`, no inyecta headers y conserva credenciales solo para sembrar login local.
+- [x] **GREEN — arranque local seguro.** Actualizar el script para arrancar Next directamente en loopback, imprimir URL/email de login sin contraseña por defecto y separar bootstrap de runtime.
+- [x] **RED/GREEN — procedimiento productivo.** Documentar y automatizar solo las comprobaciones necesarias para backup, `--check`, aplicación autorizada, verificación de UUID/conteos, despliegue cerrado, smoke y activación.
+- [x] **TRIANGULATE — fallo y recuperación.** Simular conflicto de preflight, fallo de despliegue y rollback; comprobar que no se amplía acceso, no se borran/reasignan datos y las membresías válidas no se eliminan automáticamente.
+- [x] **REFACTOR — gate de seguridad.** Añadir búsquedas/tests que fallen ante secretos administrativos o nombres temporales en el grafo runtime y validar allowlist de imports bootstrap server-only.
+- [x] **Gate final.** Ejecutar `npm test`, `npm run build`, validación RLS local completa y smoke manual de login/logout; conservar evidencia de backup, plan, UUID y conteos antes/después.
 
 **Documentación:** completar procedimiento de despliegue, activación, observabilidad, congelación/revocación de sesiones ante sospecha de cruce y rollback; dejar explícita la separación futura entre plataforma y familia.
 

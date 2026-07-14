@@ -70,9 +70,18 @@ export function detectarImportsClienteIndebidosEnRepositorio(
 }
 
 const PATRON_CLAVE_PRIVILEGIADA = /service_role_key|supabase_service_role/i;
+const IDENTIFICADORES_RUNTIME_PROHIBIDOS = [
+  'SUPABASE_HOUSEHOLD_ID_DESARROLLO',
+  'VEHICULOS_ACCESS_TOKEN',
+  'SUPABASE_SERVICE_ROLE_KEY',
+] as const;
 
 export function contieneClavePrivilegiada(contenido: string): boolean {
   return PATRON_CLAVE_PRIVILEGIADA.test(contenido);
+}
+
+export function detectarIdentificadoresTemporalesEnRuntime(contenido: string): string[] {
+  return IDENTIFICADORES_RUNTIME_PROHIBIDOS.filter((identificador) => contenido.includes(identificador));
 }
 
 // Módulos que bypassean RLS a propósito (sembrado administrativo). Deben

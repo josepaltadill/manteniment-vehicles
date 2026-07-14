@@ -3,6 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   contieneClavePrivilegiada,
+  detectarIdentificadoresTemporalesEnRuntime,
   detectarImportadorNoPermitidoDeBootstrap,
   detectarImportadoresNoPermitidosDeBootstrap,
   detectarImportsClienteIndebidosEnContenido,
@@ -59,6 +60,20 @@ describe('contieneClavePrivilegiada', () => {
     expect(
       contieneClavePrivilegiada('// se autentica como usuario real, no con `service_role`.'),
     ).toBe(false);
+  });
+
+  it('detecta identidad temporal y secretos administrativos en un módulo runtime', () => {
+    const contenido = [
+      'const hogar = process.env.SUPABASE_HOUSEHOLD_ID_DESARROLLO;',
+      'const token = process.env.VEHICULOS_ACCESS_TOKEN;',
+      'const clave = process.env.SUPABASE_SERVICE_ROLE_KEY;',
+    ].join('\n');
+
+    expect(detectarIdentificadoresTemporalesEnRuntime(contenido)).toEqual([
+      'SUPABASE_HOUSEHOLD_ID_DESARROLLO',
+      'VEHICULOS_ACCESS_TOKEN',
+      'SUPABASE_SERVICE_ROLE_KEY',
+    ]);
   });
 });
 
@@ -162,6 +177,22 @@ describe('guardas de seguridad sobre el repositorio real', () => {
     const archivos = [...archivosDeProduccion(), ...listarArchivosFuente(RAIZ_SCRIPTS)];
 
     const hallazgos = detectarImportadoresNoPermitidosDeBootstrap(archivos);
+
+    expect(hallazgos).toEqual([]);
+  });
+
+  it('el grafo runtime no contiene identidad temporal ni secretos administrativos', () => {
+    const archivosRuntime = archivosDeProduccion().filter(
+      (archivo) =>
+        archivo.includes('/src/app/') ||
+        archivo.includes('/src/compartido/infraestructura/') ||
+        archivo.endsWith('/src/modulos/vehiculos/interfaz/composicion/dependencias-servidor.ts') ||
+        archivo.endsWith('/src/proxy.ts'),
+    );
+
+    const hallazgos = archivosRuntime.flatMap((archivo) =>
+      detectarIdentificadoresTemporalesEnRuntime(readFileSync(archivo, 'utf8')).map((identificador) => ({ archivo, identificador })),
+    );
 
     expect(hallazgos).toEqual([]);
   });

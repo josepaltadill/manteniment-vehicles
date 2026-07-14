@@ -32,18 +32,47 @@ function correrRunner(
 }
 
 describe('contrato de proceso del runner de bootstrap administrativo', () => {
-  it('conserva la siembra histórica por defecto y valida sus variables privadas', () => {
+  it('usa preflight no mutante por defecto y exige su UUID Auth', () => {
     const resultado = correrRunner({
       SUPABASE_BOOTSTRAP_DATABASE_URL: 'postgresql://operator@example.test/postgres',
-      SUPABASE_BOOTSTRAP_EMAIL: '',
-      SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
-      SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Hogar runner incompleto',
       SUPABASE_BOOTSTRAP_ADMIN_USER_ID: '',
     });
 
     expect(resultado.status).not.toBe(0);
+    expect(resultado.stderr).toContain('SUPABASE_BOOTSTRAP_ADMIN_USER_ID debe ser un UUID Auth válido');
+  });
+
+  it('reserva la siembra histórica para --seed-local explícito', () => {
+    const resultado = correrRunner(
+      {
+        SUPABASE_BOOTSTRAP_DATABASE_URL: 'postgresql://operator@example.test/postgres',
+        SUPABASE_BOOTSTRAP_EMAIL: '',
+        SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
+        SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Familia Altadill',
+      },
+      ['--seed-local'],
+    );
+
+    expect(resultado.status).not.toBe(0);
     expect(resultado.stderr).toContain('Falta la variable privada obligatoria SUPABASE_BOOTSTRAP_EMAIL');
-    expect(resultado.stderr).not.toContain('SUPABASE_BOOTSTRAP_ADMIN_USER_ID debe ser un UUID');
+  });
+
+  it.each([
+    ['--seed-local combinado con --apply', ['--seed-local', '--apply'], '--seed-local no admite otros argumentos.'],
+    ['--seed-local combinado con un argumento desconocido', ['--seed-local', '--desconocido'], 'Argumento de bootstrap no reconocido.'],
+  ])('valida %s antes de iniciar la siembra local', (_descripcion, argumentos, errorEsperado) => {
+    const resultado = correrRunner(
+      {
+        SUPABASE_BOOTSTRAP_DATABASE_URL: 'postgresql://operator@example.test/postgres',
+        SUPABASE_BOOTSTRAP_EMAIL: '',
+        SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
+      },
+      argumentos,
+    );
+
+    expect(resultado.status).not.toBe(0);
+    expect(resultado.stderr).toContain(errorEsperado);
+    expect(resultado.stderr).not.toContain('Falta la variable privada obligatoria SUPABASE_BOOTSTRAP_EMAIL');
   });
 
   it('activa el preflight solo con --check y exige su UUID Auth', () => {
@@ -74,12 +103,15 @@ ejecutar('integración real del runner de bootstrap administrativo', () => {
   it('ejecuta el bootstrap real y reporta los ids sembrados con código de salida 0', () => {
     const sufijo = randomUUID();
 
-    const resultado = correrRunner({
-      SUPABASE_BOOTSTRAP_DATABASE_URL: databaseUrl,
-      SUPABASE_BOOTSTRAP_EMAIL: `bootstrap-runner-${sufijo}@ejemplo.local`,
-      SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
-      SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: `Hogar runner ${sufijo}`,
-    });
+    const resultado = correrRunner(
+      {
+        SUPABASE_BOOTSTRAP_DATABASE_URL: databaseUrl,
+        SUPABASE_BOOTSTRAP_EMAIL: `bootstrap-runner-${sufijo}@ejemplo.local`,
+        SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
+        SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: `Hogar runner ${sufijo}`,
+      },
+      ['--seed-local'],
+    );
 
     expect(resultado.status).toBe(0);
     expect(resultado.stdout).toContain('Bootstrap administrativo completado.');
@@ -91,12 +123,15 @@ ejecutar('integración real del runner de bootstrap administrativo', () => {
   });
 
   it('falla con código de salida distinto de 0 y un mensaje claro si falta una variable privada', () => {
-    const resultado = correrRunner({
-      SUPABASE_BOOTSTRAP_DATABASE_URL: databaseUrl,
-      SUPABASE_BOOTSTRAP_EMAIL: '',
-      SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
-      SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Hogar runner incompleto',
-    });
+    const resultado = correrRunner(
+      {
+        SUPABASE_BOOTSTRAP_DATABASE_URL: databaseUrl,
+        SUPABASE_BOOTSTRAP_EMAIL: '',
+        SUPABASE_BOOTSTRAP_PASSWORD: 'password-local-de-prueba',
+        SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Hogar runner incompleto',
+      },
+      ['--seed-local'],
+    );
 
     expect(resultado.status).not.toBe(0);
     expect(resultado.stderr).toContain('Falta la variable privada obligatoria SUPABASE_BOOTSTRAP_EMAIL');
@@ -106,12 +141,15 @@ ejecutar('integración real del runner de bootstrap administrativo', () => {
     const contrasenaSecreta = `secreto-${randomUUID()}`;
     const urlConexion = `postgresql://postgres:${contrasenaSecreta}@127.0.0.1:54322/postgres`;
 
-    const resultadoExitoso = correrRunner({
-      SUPABASE_BOOTSTRAP_DATABASE_URL: urlConexion,
-      SUPABASE_BOOTSTRAP_EMAIL: `bootstrap-runner-${randomUUID()}@ejemplo.local`,
-      SUPABASE_BOOTSTRAP_PASSWORD: contrasenaSecreta,
-      SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: `Hogar runner ${randomUUID()}`,
-    });
+    const resultadoExitoso = correrRunner(
+      {
+        SUPABASE_BOOTSTRAP_DATABASE_URL: urlConexion,
+        SUPABASE_BOOTSTRAP_EMAIL: `bootstrap-runner-${randomUUID()}@ejemplo.local`,
+        SUPABASE_BOOTSTRAP_PASSWORD: contrasenaSecreta,
+        SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: `Hogar runner ${randomUUID()}`,
+      },
+      ['--seed-local'],
+    );
 
     expect(resultadoExitoso.stdout).not.toContain(contrasenaSecreta);
     expect(resultadoExitoso.stderr).not.toContain(contrasenaSecreta);
@@ -119,12 +157,15 @@ ejecutar('integración real del runner de bootstrap administrativo', () => {
     householdId = resultadoExitoso.stdout.match(new RegExp(`householdId: (${UUID.source})`, 'i'))?.[1];
     userId = resultadoExitoso.stdout.match(new RegExp(`userId: (${UUID.source})`, 'i'))?.[1];
 
-    const resultadoFallido = correrRunner({
-      SUPABASE_BOOTSTRAP_DATABASE_URL: `postgresql://postgres:${contrasenaSecreta}@127.0.0.1:54322/base_inexistente`,
-      SUPABASE_BOOTSTRAP_EMAIL: `bootstrap-runner-${randomUUID()}@ejemplo.local`,
-      SUPABASE_BOOTSTRAP_PASSWORD: contrasenaSecreta,
-      SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Hogar runner fallido',
-    });
+    const resultadoFallido = correrRunner(
+      {
+        SUPABASE_BOOTSTRAP_DATABASE_URL: `postgresql://postgres:${contrasenaSecreta}@127.0.0.1:54322/base_inexistente`,
+        SUPABASE_BOOTSTRAP_EMAIL: `bootstrap-runner-${randomUUID()}@ejemplo.local`,
+        SUPABASE_BOOTSTRAP_PASSWORD: contrasenaSecreta,
+        SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE: 'Hogar runner fallido',
+      },
+      ['--seed-local'],
+    );
 
     expect(resultadoFallido.status).not.toBe(0);
     expect(resultadoFallido.stdout).not.toContain(contrasenaSecreta);

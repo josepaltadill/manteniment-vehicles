@@ -30,6 +30,10 @@ describe('contrato CLI del bootstrap administrativo', () => {
     expect(() => leerSolicitudBootstrap([], { ...entorno, SUPABASE_BOOTSTRAP_ADMIN_USER_ID: 'email@example.test' })).toThrow(/UUID Auth/);
   });
 
+  it('reconoce la siembra local explícita sin convertirla en un modo productivo', () => {
+    expect(leerSolicitudBootstrap(['--seed-local'], entorno)).toMatchObject({ modo: 'seed-local' });
+  });
+
   it('serializa el plan sin URL ni otros secretos', () => {
     const salida = serializarPlanBootstrap({ estado: 'listo', acciones: [{ tipo: 'noop', householdId: '10000000-0000-4000-8000-000000000001' }], conteos: { vehiculos: 2, eventos: 4 } });
     expect(salida).toContain('"estado": "listo"');
