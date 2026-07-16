@@ -47,7 +47,7 @@ Chain strategy: feature-branch-chain
 
 ### REFACTOR
 
-- [ ] Consolidar nombres y paths según las convenciones existentes, preservar renames/historial cuando sea posible y eliminar duplicaciones de resolución sin cambiar casos de uso del MVP. <!-- sdd-owner: implementation -->
+- [x] Consolidar nombres y paths según las convenciones existentes, preservar renames/historial cuando sea posible y eliminar duplicaciones de resolución sin cambiar casos de uso del MVP. <!-- sdd-owner: implementation -->
 
 ## PR 2 — Migración SQL atómica y evidencia de corte
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { crearIdentificador } from '../../../../compartido/dominio/identificador';
-import { ProveedorIdentidadTemporal } from '../../aplicacion/pruebas/contexto-familiar-temporal';
+import { ContextoFamiliarTemporal } from '../../aplicacion/pruebas/contexto-familiar-temporal';
 import { RepositorioEventosVehiculoEnMemoria } from '../../aplicacion/pruebas/repositorio-eventos-vehiculo-en-memoria';
 import { RepositorioVehiculosEnMemoria } from '../../aplicacion/pruebas/repositorio-vehiculos-en-memoria';
 import { registrarVehiculo } from '../../aplicacion/casos-uso/registrar-vehiculo';
@@ -12,10 +12,10 @@ const proveedorFechaFija = { ahora: () => new Date('2026-05-01T10:00:00.000Z') }
 async function dependenciasConVehiculo() {
   const repositorioVehiculos = new RepositorioVehiculosEnMemoria();
   const repositorioEventosVehiculo = new RepositorioEventosVehiculoEnMemoria(repositorioVehiculos);
-  const proveedorIdentidad = new ProveedorIdentidadTemporal(hogarA);
+  const contextoFamiliar = new ContextoFamiliarTemporal(hogarA);
 
   const vehiculo = await registrarVehiculo(
-    { repositorioVehiculos, proveedorIdentidad },
+    { repositorioVehiculos, contextoFamiliar },
     {
       id: crearIdentificador('vehiculo-1'),
       marca: 'Toyota',
@@ -33,7 +33,7 @@ async function dependenciasConVehiculo() {
     dependencias: {
       repositorioVehiculos,
       unidadTrabajoVehiculos: repositorioEventosVehiculo,
-      proveedorIdentidad,
+      contextoFamiliar,
       proveedorFecha: proveedorFechaFija,
     },
     vehiculo,

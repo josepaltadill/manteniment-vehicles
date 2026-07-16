@@ -14,7 +14,7 @@ export type DependenciasVehiculos = Readonly<{
   repositorioVehiculos: RepositorioVehiculos;
   repositorioEventosVehiculo: RepositorioEventosVehiculo;
   unidadTrabajoVehiculos: UnidadTrabajoVehiculos;
-  proveedorIdentidad: ContextoAplicacion;
+  contextoFamiliar: ContextoAplicacion;
   proveedorFecha: ProveedorFecha;
 }>;
 
@@ -24,7 +24,7 @@ export function crearDependenciasVehiculos(alcance: AlcanceFamiliar): Dependenci
     repositorioVehiculos: new RepositorioVehiculosSupabase(alcance.clienteSupabase),
     repositorioEventosVehiculo: repositorioEventosSupabase,
     unidadTrabajoVehiculos: repositorioEventosSupabase,
-    proveedorIdentidad: alcance.contextoFamiliar,
+    contextoFamiliar: alcance.contextoFamiliar,
     proveedorFecha: new ProveedorFechaSistema(),
   };
 }

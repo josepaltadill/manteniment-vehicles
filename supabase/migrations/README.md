@@ -168,13 +168,13 @@ autenticada normal.
 
 ### Procedimiento de siembra (idempotente)
 
-`src/modulos/vehiculos/adaptadores/supabase/bootstrap-servidor.ts` expone
+`src/nucleo-familiar/adaptadores/supabase/bootstrap-servidor.ts` expone
 `sembrarHogarDeDesarrollo(operaciones, entrada)`, que busca-o-crea, en este orden:
 usuario de desarrollo (`SUPABASE_BOOTSTRAP_EMAIL`/`SUPABASE_BOOTSTRAP_PASSWORD`),
 hogar (`SUPABASE_BOOTSTRAP_HOUSEHOLD_NOMBRE`) y membresía `admin` del usuario en ese
 hogar. Reejecutarlo no duplica ninguno de los tres (ver
 `bootstrap-servidor.test.ts`). El `householdId` de desarrollo que usa
-`ProveedorIdentidadSupabaseServidor` (`src/modulos/vehiculos/adaptadores/supabase/proveedor-identidad-supabase-servidor.ts`)
+`ProveedorIdentidadSupabaseServidor` (`src/nucleo-familiar/adaptadores/supabase/proveedor-identidad-supabase-servidor.ts`)
 es exactamente el `mv_households.id` real devuelto por este bootstrap, nunca un
 valor arbitrario. El puerto `OperacionesBootstrap` representa el acceso
 administrativo aislado descrito arriba; su implementación real contra

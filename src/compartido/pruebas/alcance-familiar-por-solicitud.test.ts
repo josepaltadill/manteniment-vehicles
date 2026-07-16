@@ -12,7 +12,8 @@ type Composicion = Readonly<{
 }>;
 const CONTEXTO: Contexto = { actor: { id: '11111111-1111-4111-8111-111111111111', rol: 'admin' }, householdId: '22222222-2222-4222-8222-222222222222' };
 const cargar = () => import('../../composicion/servidor/alcance-familiar-por-solicitud') as Promise<Composicion>;
-function dependenciasPara(acceso: Acceso) { const cliente = { origen: 'ssr' }; const resolverAcceso = vi.fn(async () => acceso); const crearClienteSupabase = vi.fn(() => cliente); const crearProveedorIdentidad = vi.fn(() => ({ resolverAcceso })); return { cliente, resolverAcceso, crearClienteSupabase, crearProveedorIdentidad }; }
+function dependenciasPara(acceso: Acceso) { const cliente = { origen: 'ssr' }; const resolverAcceso = vi.fn(async () => acceso); const crearClienteSupabase = vi.fn(() => cliente); const crearProveedorIdentidad = vi.fn(() => ({ resolverAcceso }));
+  return { cliente, resolverAcceso, crearClienteSupabase, crearProveedorIdentidad }; }
 
 describe('resolverAlcanceFamiliarPorSolicitud', () => {
   it.each([

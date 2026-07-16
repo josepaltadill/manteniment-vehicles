@@ -5,7 +5,7 @@ import type { RepositorioVehiculos } from '../puertos/repositorio-vehiculos';
 
 export type DependenciasCorregirKilometraje = Readonly<{
   repositorioVehiculos: RepositorioVehiculos;
-  proveedorIdentidad: ContextoAplicacion;
+  contextoFamiliar: ContextoAplicacion;
 }>;
 
 export type EntradaCorregirKilometraje = Readonly<{
@@ -17,7 +17,7 @@ export async function corregirKilometraje(
   dependencias: DependenciasCorregirKilometraje,
   entrada: EntradaCorregirKilometraje,
 ): Promise<void> {
-  const { householdId } = dependencias.proveedorIdentidad;
+  const { householdId } = dependencias.contextoFamiliar;
   const vehiculo = await dependencias.repositorioVehiculos.buscarPorId(householdId, entrada.vehiculoId);
 
   if (!vehiculo) {

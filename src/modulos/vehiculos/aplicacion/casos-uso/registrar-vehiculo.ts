@@ -5,14 +5,14 @@ import type { RepositorioVehiculos } from '../puertos/repositorio-vehiculos';
 
 export type DependenciasRegistrarVehiculo = Readonly<{
   repositorioVehiculos: RepositorioVehiculos;
-  proveedorIdentidad: ContextoAplicacion;
+  contextoFamiliar: ContextoAplicacion;
 }>;
 
 export async function registrarVehiculo(
   dependencias: DependenciasRegistrarVehiculo,
   datos: DatosCrearVehiculo,
 ): Promise<Vehiculo> {
-  const { householdId } = dependencias.proveedorIdentidad;
+  const { householdId } = dependencias.contextoFamiliar;
 
   if (await dependencias.repositorioVehiculos.existeMatricula(householdId, datos.matricula)) {
     throw new ErrorDominio('Ya existe un vehículo con esa matrícula.');

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { crearIdentificador } from '../../../../compartido/dominio/identificador';
 import { ErrorDominio } from '../../dominio/errores-dominio';
-import { ProveedorIdentidadTemporal } from '../pruebas/contexto-familiar-temporal';
+import { ContextoFamiliarTemporal } from '../pruebas/contexto-familiar-temporal';
 import { RepositorioVehiculosEnMemoria } from '../pruebas/repositorio-vehiculos-en-memoria';
 import { registrarVehiculo } from './registrar-vehiculo';
 import { obtenerVehiculo } from './obtener-vehiculo';
@@ -24,11 +24,11 @@ const entradaVehiculo = () => ({
 describe('obtenerVehiculo', () => {
   it('devuelve el vehículo cuando existe en el hogar actual', async () => {
     const repositorioVehiculos = new RepositorioVehiculosEnMemoria();
-    const proveedorIdentidad = new ProveedorIdentidadTemporal(hogarA);
-    await registrarVehiculo({ repositorioVehiculos, proveedorIdentidad }, entradaVehiculo());
+    const contextoFamiliar = new ContextoFamiliarTemporal(hogarA);
+    await registrarVehiculo({ repositorioVehiculos, contextoFamiliar }, entradaVehiculo());
 
     const vehiculo = await obtenerVehiculo(
-      { repositorioVehiculos, proveedorIdentidad },
+      { repositorioVehiculos, contextoFamiliar },
       { vehiculoId: crearIdentificador('vehiculo-1234 ABC') },
     );
 
@@ -37,14 +37,14 @@ describe('obtenerVehiculo', () => {
 
   it('lanza ErrorDominio si el vehículo no existe en el hogar actual', async () => {
     const repositorioVehiculos = new RepositorioVehiculosEnMemoria();
-    const proveedorIdentidad = new ProveedorIdentidadTemporal(hogarA);
-    await registrarVehiculo({ repositorioVehiculos, proveedorIdentidad }, entradaVehiculo());
+    const contextoFamiliar = new ContextoFamiliarTemporal(hogarA);
+    await registrarVehiculo({ repositorioVehiculos, contextoFamiliar }, entradaVehiculo());
 
-    const proveedorIdentidadHogarB = new ProveedorIdentidadTemporal(hogarB);
+    const contextoFamiliarHogarB = new ContextoFamiliarTemporal(hogarB);
 
     await expect(
       obtenerVehiculo(
-        { repositorioVehiculos, proveedorIdentidad: proveedorIdentidadHogarB },
+        { repositorioVehiculos, contextoFamiliar: contextoFamiliarHogarB },
         { vehiculoId: crearIdentificador('vehiculo-1234 ABC') },
       ),
     ).rejects.toThrow(new ErrorDominio('No existe el vehículo indicado.'));

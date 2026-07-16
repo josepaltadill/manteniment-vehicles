@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { crearIdentificador } from '../../../../compartido/dominio/identificador';
-import { ProveedorIdentidadTemporal } from '../../aplicacion/pruebas/contexto-familiar-temporal';
+import { ContextoFamiliarTemporal } from '../../aplicacion/pruebas/contexto-familiar-temporal';
 import { RepositorioVehiculosEnMemoria } from '../../aplicacion/pruebas/repositorio-vehiculos-en-memoria';
 
 const revalidatePathMock = vi.fn();
@@ -36,7 +36,7 @@ const entradaFormularioValida = () => ({
 function dependencias() {
   return {
     repositorioVehiculos: new RepositorioVehiculosEnMemoria(),
-    proveedorIdentidad: new ProveedorIdentidadTemporal(hogarA),
+    contextoFamiliar: new ContextoFamiliarTemporal(hogarA),
     proveedorFecha: proveedorFechaFija,
   };
 }

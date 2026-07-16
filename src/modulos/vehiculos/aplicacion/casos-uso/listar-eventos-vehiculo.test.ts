@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { crearIdentificador } from '../../../../compartido/dominio/identificador';
 import { crearEventoVehiculo } from '../../dominio/evento-vehiculo';
-import { ProveedorIdentidadTemporal } from '../pruebas/contexto-familiar-temporal';
+import { ContextoFamiliarTemporal } from '../pruebas/contexto-familiar-temporal';
 import { RepositorioEventosVehiculoEnMemoria } from '../pruebas/repositorio-eventos-vehiculo-en-memoria';
 import { listarEventosVehiculo } from './listar-eventos-vehiculo';
 
@@ -22,11 +22,11 @@ const entradaEvento = (id: string, kilometros: number) => ({
 describe('listarEventosVehiculo', () => {
   it('lista los eventos del vehículo indicado en el hogar actual', async () => {
     const repositorioEventos = new RepositorioEventosVehiculoEnMemoria();
-    const proveedorIdentidad = new ProveedorIdentidadTemporal(hogarA);
+    const contextoFamiliar = new ContextoFamiliarTemporal(hogarA);
     await repositorioEventos.guardar(hogarA, crearEventoVehiculo(entradaEvento('evento-1', 120_005)));
 
     const eventos = await listarEventosVehiculo(
-      { repositorioEventosVehiculo: repositorioEventos, proveedorIdentidad },
+      { repositorioEventosVehiculo: repositorioEventos, contextoFamiliar },
       { vehiculoId },
     );
 
@@ -37,10 +37,10 @@ describe('listarEventosVehiculo', () => {
   it('no devuelve eventos de otro hogar aunque compartan vehiculoId', async () => {
     const repositorioEventos = new RepositorioEventosVehiculoEnMemoria();
     await repositorioEventos.guardar(hogarA, crearEventoVehiculo(entradaEvento('evento-1', 120_005)));
-    const proveedorIdentidadHogarB = new ProveedorIdentidadTemporal(hogarB);
+    const contextoFamiliarHogarB = new ContextoFamiliarTemporal(hogarB);
 
     const eventos = await listarEventosVehiculo(
-      { repositorioEventosVehiculo: repositorioEventos, proveedorIdentidad: proveedorIdentidadHogarB },
+      { repositorioEventosVehiculo: repositorioEventos, contextoFamiliar: contextoFamiliarHogarB },
       { vehiculoId },
     );
 

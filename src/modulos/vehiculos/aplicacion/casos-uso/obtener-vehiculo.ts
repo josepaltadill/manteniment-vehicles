@@ -6,7 +6,7 @@ import type { RepositorioVehiculos } from '../puertos/repositorio-vehiculos';
 
 export type DependenciasObtenerVehiculo = Readonly<{
   repositorioVehiculos: RepositorioVehiculos;
-  proveedorIdentidad: ContextoAplicacion;
+  contextoFamiliar: ContextoAplicacion;
 }>;
 
 export type EntradaObtenerVehiculo = Readonly<{
@@ -17,7 +17,7 @@ export async function obtenerVehiculo(
   dependencias: DependenciasObtenerVehiculo,
   entrada: EntradaObtenerVehiculo,
 ): Promise<Vehiculo> {
-  const { householdId } = dependencias.proveedorIdentidad;
+  const { householdId } = dependencias.contextoFamiliar;
   const vehiculo = await dependencias.repositorioVehiculos.buscarPorId(householdId, entrada.vehiculoId);
 
   if (!vehiculo) {

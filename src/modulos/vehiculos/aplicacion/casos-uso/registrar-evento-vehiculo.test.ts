@@ -3,7 +3,7 @@ import { crearIdentificador } from '../../../../compartido/dominio/identificador
 import { crearVehiculo } from '../../dominio/vehiculo';
 import type { RepositorioVehiculos } from '../puertos/repositorio-vehiculos';
 import type { UnidadTrabajoVehiculos } from '../puertos/repositorio-eventos-vehiculo';
-import { ProveedorIdentidadTemporal } from '../pruebas/contexto-familiar-temporal';
+import { ContextoFamiliarTemporal } from '../pruebas/contexto-familiar-temporal';
 import { registrarEventoVehiculo } from './registrar-evento-vehiculo';
 
 // Contrato de atomicidad evento + kilometraje (tarea 8, diseño §5.4/§14). Este
@@ -47,7 +47,7 @@ describe('registrarEventoVehiculo — contrato atómico evento + kilometraje', (
       {
         repositorioVehiculos: repositorioVehiculosFalso(),
         unidadTrabajoVehiculos: unidadTrabajo,
-        proveedorIdentidad: new ProveedorIdentidadTemporal(hogarA),
+        contextoFamiliar: new ContextoFamiliarTemporal(hogarA),
         proveedorFecha: { ahora: () => new Date('2026-02-01T10:00:00.000Z') },
       },
       {
@@ -77,7 +77,7 @@ describe('registrarEventoVehiculo — contrato atómico evento + kilometraje', (
         {
           repositorioVehiculos: repositorioVehiculosFalso(),
           unidadTrabajoVehiculos: unidadTrabajo,
-          proveedorIdentidad: new ProveedorIdentidadTemporal(hogarA),
+          contextoFamiliar: new ContextoFamiliarTemporal(hogarA),
           proveedorFecha: { ahora: () => new Date('2026-02-01T10:00:00.000Z') },
         },
         {
@@ -103,7 +103,7 @@ describe('registrarEventoVehiculo — contrato atómico evento + kilometraje', (
       {
         repositorioVehiculos: repositorioVehiculosFalso(),
         unidadTrabajoVehiculos: unidadTrabajo,
-        proveedorIdentidad: new ProveedorIdentidadTemporal(hogarA),
+        contextoFamiliar: new ContextoFamiliarTemporal(hogarA),
         proveedorFecha: { ahora: () => new Date('2026-02-01T10:00:00.000Z') },
       },
       {

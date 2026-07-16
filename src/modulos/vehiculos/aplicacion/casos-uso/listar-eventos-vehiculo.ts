@@ -5,7 +5,7 @@ import type { RepositorioEventosVehiculo } from '../puertos/repositorio-eventos-
 
 export type DependenciasListarEventosVehiculo = Readonly<{
   repositorioEventosVehiculo: RepositorioEventosVehiculo;
-  proveedorIdentidad: ContextoAplicacion;
+  contextoFamiliar: ContextoAplicacion;
 }>;
 
 export type EntradaListarEventosVehiculo = Readonly<{
@@ -16,7 +16,7 @@ export async function listarEventosVehiculo(
   dependencias: DependenciasListarEventosVehiculo,
   entrada: EntradaListarEventosVehiculo,
 ): Promise<EventoVehiculo[]> {
-  const { householdId } = dependencias.proveedorIdentidad;
+  const { householdId } = dependencias.contextoFamiliar;
 
   return dependencias.repositorioEventosVehiculo.listarPorVehiculo(householdId, entrada.vehiculoId);
 }
