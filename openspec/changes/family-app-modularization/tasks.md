@@ -42,8 +42,8 @@ Chain strategy: feature-branch-chain
 
 ### TRIANGULATE
 
-- [ ] Ejecutar `npm test` y añadir casos que comprueben que URL, formulario, cookie, cabecera o parámetro `household_id` no sustituyen el contexto resuelto por el servidor. <!-- sdd-owner: implementation -->
-- [ ] Verificar mediante búsqueda de imports y tests que el núcleo no depende de vehículos, que el cliente no importa adaptadores y que el runtime ordinario no usa `service_role`. <!-- sdd-owner: implementation -->
+- [x] Ejecutar `npm test` y añadir casos que comprueben que URL, formulario, cookie, cabecera o parámetro `household_id` no sustituyen el contexto resuelto por el servidor. <!-- sdd-owner: implementation -->
+- [x] Verificar mediante búsqueda de imports y tests que el núcleo no depende de vehículos, que el cliente no importa adaptadores y que el runtime ordinario no usa `service_role`. <!-- sdd-owner: implementation -->
 
 ### REFACTOR
 
