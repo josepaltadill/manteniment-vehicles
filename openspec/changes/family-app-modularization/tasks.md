@@ -30,7 +30,7 @@ Chain strategy: feature-branch-chain
 
 ### RED
 
-- [ ] Añadir pruebas de frontera en `src/compartido/pruebas/` o el directorio de tests existente que fallen si `src/nucleo-familiar/**` importa `src/modulos/vehiculos/**`, si un componente cliente importa adaptadores Supabase o si vehículos resuelve identidad más de una vez. <!-- sdd-owner: implementation -->
+- [ ] Añadir pruebas de frontera en `src/compartido/pruebas/` o el directorio de tests existente que fallen si `src/nucleo-familiar/**` importa `src/modulos/vehiculos/**`, si un componente cliente importa adaptadores Supabase o si cualquier elemento bajo `src/modulos/vehiculos/**` resuelve identidad. <!-- sdd-owner: implementation -->
 - [ ] Añadir pruebas de composición para sesión ausente, cero membresías, múltiples membresías y contexto único en torno a `src/composicion/servidor/alcance-familiar-por-solicitud.ts`. <!-- sdd-owner: implementation -->
 
 ### GREEN
