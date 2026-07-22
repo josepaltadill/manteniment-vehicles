@@ -93,7 +93,7 @@ ejecutar('integración real del runner de bootstrap administrativo', () => {
   afterEach(async () => {
     const cliente = new Client({ connectionString: databaseUrl });
     await cliente.connect();
-    if (householdId) await cliente.query('delete from public.mv_households where id = $1', [householdId]);
+    if (householdId) await cliente.query('delete from public.fam_hogares where id = $1', [householdId]);
     if (userId) await cliente.query('delete from auth.users where id = $1', [userId]);
     await cliente.end();
     householdId = undefined;

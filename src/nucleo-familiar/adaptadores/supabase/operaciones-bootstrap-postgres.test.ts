@@ -89,11 +89,11 @@ describe('OperacionesBootstrapPostgres', () => {
 
     await operaciones.crearHogar('hogar de desarrollo');
 
-    // `do update set nombre = mv_households.nombre` (no `excluded.nombre`): el
+    // `do update set nombre = fam_hogares.nombre` (no `excluded.nombre`): el
     // conflicto ahora dispara para variantes de mayúsculas/espacios, no solo
     // coincidencias exactas, así que "actualizar" con el valor entrante
     // reescribiría en silencio el nombre canónico guardado.
-    expect(cliente.query.mock.calls[0]?.[0]).toContain('do update set nombre = mv_households.nombre');
+    expect(cliente.query.mock.calls[0]?.[0]).toContain('do update set nombre = fam_hogares.nombre');
     expect(cliente.query.mock.calls[0]?.[0]).not.toContain('excluded.nombre');
   });
 
@@ -103,7 +103,7 @@ describe('OperacionesBootstrapPostgres', () => {
 
     await operaciones.crearHogar('  Hogar de desarrollo  ');
 
-    expect(cliente.query).toHaveBeenCalledWith(expect.stringContaining('insert into public.mv_households'), [
+    expect(cliente.query).toHaveBeenCalledWith(expect.stringContaining('insert into public.fam_hogares'), [
       'Hogar de desarrollo',
     ]);
   });

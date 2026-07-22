@@ -23,7 +23,7 @@ async function obtenerCliente(): Promise<Client> {
 ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
   afterAll(async () => {
     const conexion = await obtenerCliente();
-    if (householdId) await conexion.query('delete from public.mv_households where id = $1', [householdId]);
+    if (householdId) await conexion.query('delete from public.fam_hogares where id = $1', [householdId]);
     if (userId) await conexion.query('delete from auth.users where id = $1', [userId]);
     await conexion.end();
   });
@@ -60,7 +60,7 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
     userId = primera.userId.valor;
     const segunda = await ejecutarBootstrapPostgresDesdeEntorno(entorno);
     const membresias = await (await obtenerCliente()).query<{ rol: string }>(
-      'select rol from public.mv_household_members where household_id = $1 and user_id = $2',
+      'select rol from public.fam_miembros_hogar where household_id = $1 and user_id = $2',
       [householdId, userId],
     );
 
@@ -71,12 +71,12 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
   it('crearHogar acepta nombres con metacaracteres de SQL sin corromper la query (parametrizado)', async () => {
     const conexion = await obtenerCliente();
     const operaciones = new OperacionesBootstrapPostgres({ query: conexion.query.bind(conexion) });
-    const nombreConMetacaracteres = `Hogar' OR '1'='1'; DROP TABLE mv_households; -- ${randomUUID()}`;
+    const nombreConMetacaracteres = `Hogar' OR '1'='1'; DROP TABLE fam_hogares; -- ${randomUUID()}`;
 
     const hogar = await operaciones.crearHogar(nombreConMetacaracteres);
     try {
       const encontrado = await operaciones.buscarHogarPorNombre(nombreConMetacaracteres);
-      const filas = await conexion.query('select nombre from public.mv_households where id = $1', [hogar.id]);
+      const filas = await conexion.query('select nombre from public.fam_hogares where id = $1', [hogar.id]);
 
       // Si el valor se concatenara en vez de parametrizarse, este nombre
       // rompería la query (sintaxis inválida) o ejecutaría SQL arbitrario en
@@ -85,7 +85,7 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
       expect(encontrado?.id).toBe(hogar.id);
       expect(filas.rows).toEqual([{ nombre: nombreConMetacaracteres }]);
     } finally {
-      await conexion.query('delete from public.mv_households where id = $1', [hogar.id]);
+      await conexion.query('delete from public.fam_hogares where id = $1', [hogar.id]);
     }
   });
 
@@ -118,7 +118,7 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
       await expect(operaciones.crearMembresiaAdmin(hogar.id, usuario.id)).resolves.toBeUndefined();
 
       const filas = await conexion.query(
-        'select rol from public.mv_household_members where household_id = $1 and user_id = $2',
+        'select rol from public.fam_miembros_hogar where household_id = $1 and user_id = $2',
         [hogar.id, usuario.id],
       );
       expect(filas.rows).toEqual([{ rol: 'admin' }]);
@@ -126,7 +126,7 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
       // Borrar el hogar primero (cascada a la membresía): el trigger de último
       // admin solo bloquea un delete directo de la membresía mientras el hogar
       // sigue existiendo, no la cascada de borrar el hogar completo.
-      await conexion.query('delete from public.mv_households where id = $1', [hogar.id]);
+      await conexion.query('delete from public.fam_hogares where id = $1', [hogar.id]);
       await conexion.query('delete from auth.users where id = $1', [usuario.id]);
     }
   });
@@ -143,7 +143,7 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
     expect(segundo.id).toBe(primero.id);
     expect(conteo).toBe(1);
 
-    await conexion.query('delete from public.mv_households where id = $1', [primero.id]);
+    await conexion.query('delete from public.fam_hogares where id = $1', [primero.id]);
   });
 
   it('crearHogar resuelve variantes de mayúsculas/espacios como el mismo hogar', async () => {
@@ -158,7 +158,7 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
     const encontradoPorVariante = await operaciones.buscarHogarPorNombre(nombreVariante);
     const conteo = await operaciones.contarHogaresPorNombre(nombreVariante);
     const filaAlmacenada = await conexion.query<{ nombre: string }>(
-      'select nombre from public.mv_households where id = $1',
+      'select nombre from public.fam_hogares where id = $1',
       [primero.id],
     );
 
@@ -166,11 +166,11 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
     expect(encontradoPorVariante?.id).toBe(primero.id);
     expect(conteo).toBe(1);
     // El conflicto con la variante NO debe reescribir el nombre canónico ya
-    // guardado: `do update set nombre = mv_households.nombre` debe conservar
+    // guardado: `do update set nombre = fam_hogares.nombre` debe conservar
     // el nombre original, no adoptar el de la variante entrante.
     expect(filaAlmacenada.rows).toEqual([{ nombre: nombreOriginal }]);
 
-    await conexion.query('delete from public.mv_households where id = $1', [primero.id]);
+    await conexion.query('delete from public.fam_hogares where id = $1', [primero.id]);
   });
 
   it('falla explícito en vez de sobrescribir una membresía existente con rol distinto de admin', async () => {
@@ -183,7 +183,7 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
     const usuario = await operaciones.crearUsuario(email, 'password-local-de-prueba');
     const hogar = await operaciones.crearHogar(nombreHogar);
     await conexion.query(
-      `insert into public.mv_household_members (household_id, user_id, rol) values ($1, $2, 'editor')`,
+      `insert into public.fam_miembros_hogar (household_id, user_id, rol) values ($1, $2, 'editor')`,
       [hogar.id, usuario.id],
     );
 
@@ -198,16 +198,16 @@ ejecutar('OperacionesBootstrapPostgres (Postgres local)', () => {
       ).rejects.toThrow(/rol "editor"/);
 
       const membresias = await conexion.query<{ rol: string }>(
-        'select rol from public.mv_household_members where household_id = $1 and user_id = $2',
+        'select rol from public.fam_miembros_hogar where household_id = $1 and user_id = $2',
         [hogar.id, usuario.id],
       );
       expect(membresias.rows).toEqual([{ rol: 'editor' }]);
     } finally {
       await conexion.query(
-        'delete from public.mv_household_members where household_id = $1 and user_id = $2',
+        'delete from public.fam_miembros_hogar where household_id = $1 and user_id = $2',
         [hogar.id, usuario.id],
       );
-      await conexion.query('delete from public.mv_households where id = $1', [hogar.id]);
+      await conexion.query('delete from public.fam_hogares where id = $1', [hogar.id]);
       await conexion.query('delete from auth.users where id = $1', [usuario.id]);
     }
   });

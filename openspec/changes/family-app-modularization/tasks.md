@@ -55,14 +55,14 @@ Chain strategy: feature-branch-chain
 
 ### RED
 
-- [ ] Crear pruebas de integración en `supabase/validation/` o el harness PostgreSQL existente que apliquen DDL histórico en una base efímera y fallen al exigir `fam_hogares`, `fam_miembros_hogar`, `fam_roles_plataforma`, `fam_ve_vehiculos` y `fam_ve_eventos_vehiculo` con los mismos UUIDs, filas y relaciones. <!-- sdd-owner: implementation -->
+- [x] Crear pruebas de integración en `supabase/validation/` o el harness PostgreSQL existente que apliquen DDL histórico en una base efímera y fallen al exigir `fam_hogares`, `fam_miembros_hogar`, `fam_roles_plataforma`, `fam_ve_vehiculos` y `fam_ve_eventos_vehiculo` con los mismos UUIDs, filas y relaciones. <!-- sdd-owner: implementation -->
 - [ ] Crear pruebas de atomicidad observable que fallen si un lector/escritor concurrente ve una mezcla de objetos `mv_*`/`fam_*`, si el orden de locks permite deadlock, o si `lock_timeout`/`statement_timeout` deja renombres parciales en lugar de rollback completo. <!-- sdd-owner: implementation -->
 - [ ] Crear pruebas de preflight que fallen ante objetos `fam_*` conflictivos, consumidores externos `mv_*` no clasificados, invariantes rotas, backup no recuperable o dependencias de catálogo no inventariadas. <!-- sdd-owner: implementation -->
 - [ ] Añadir casos de rollback/fix-forward que documenten el punto de no retorno y comprueben que la recuperación no borra, reasigna ni abre permisos inciertos. <!-- sdd-owner: implementation -->
 
 ### GREEN
 
-- [ ] Añadir `supabase/migrations/<timestamp>_family_app_modularization.sql` con una única transacción, locks en orden fijo, timeouts configurables y renombrado no destructivo de las cinco tablas. <!-- sdd-owner: implementation -->
+- [x] Añadir `supabase/migrations/<timestamp>_family_app_modularization.sql` con una única transacción, locks en orden fijo, timeouts configurables y renombrado no destructivo de las cinco tablas. <!-- sdd-owner: implementation -->
 - [ ] Actualizar dentro de la migración los cuerpos y nombres de funciones, constraints, índices, triggers y policies al prefijo propietario `fam_*`; verificar propietarios, revocaciones y grants existentes sin tratarlos como objetos renombrables, conservando `household_id`/`p_household_id` y sin crear compatibilidad `mv_*`. <!-- sdd-owner: implementation -->
 - [ ] Implementar el preflight y la evidencia operativa en los scripts/SQL existentes bajo `supabase/validation/` y `scripts/`, incluyendo backup restaurable, OID/definiciones, conteos, UUIDs, relaciones, RLS, jobs, webhooks y consumidores externos. <!-- sdd-owner: implementation -->
 - [ ] Añadir aserciones dentro y después de la migración para rechazar tablas/objetos productivos `mv_*`, exigir las cinco tablas finales, RLS habilitado y dependencias esenciales completas. <!-- sdd-owner: implementation -->
@@ -84,22 +84,22 @@ Chain strategy: feature-branch-chain
 
 ### RED
 
-- [ ] Cambiar primero las expectativas de tablas en tests de `src/modulos/vehiculos/**`, `src/nucleo-familiar/**`, `src/compartido/pruebas/**`, `scripts/` y `supabase/validation/` para que fallen contra `mv_*` y exijan `fam_*`. <!-- sdd-owner: implementation -->
+- [x] Cambiar primero las expectativas de tablas en tests de `src/modulos/vehiculos/**`, `src/nucleo-familiar/**`, `src/compartido/pruebas/**`, `scripts/` y `supabase/validation/` para que fallen contra `mv_*` y exijan `fam_*`. <!-- sdd-owner: implementation -->
 - [ ] Añadir pruebas de integración de repositorios para matrícula única por hogar incluyendo inactivos, FK compuesta, eventos cruzados, kilometraje, baja lógica, coste, año, fechas, estados, valores negativos/límite y vencimientos usando `fam_ve_*` con reloj/zonahoraria inyectados. <!-- sdd-owner: implementation -->
 
 ### GREEN
 
-- [ ] Actualizar `ProveedorIdentidadSupabaseServidor` y consultas de membresías a `fam_miembros_hogar`, manteniendo `auth.getUser()`, cardinalidad única y errores controlados. <!-- sdd-owner: implementation -->
-- [ ] Actualizar repositorios y mapeadores bajo `src/modulos/vehiculos/adaptadores/supabase/` a `fam_ve_vehiculos` y `fam_ve_eventos_vehiculo`, sin cambiar reglas del dominio. <!-- sdd-owner: implementation -->
-- [ ] Actualizar `bootstrap-preflight.ts`, `OperacionesBootstrapPostgres`, runner y pruebas de `scripts/bootstrap-admin.ts` a `fam_hogares`, `fam_miembros_hogar` y `fam_roles_plataforma`, manteniendo idempotencia y abortos ante conflicto. <!-- sdd-owner: implementation -->
-- [ ] Actualizar fixtures, cleanup, smoke tests y `scripts/validate-supabase-rls.sh` para el contrato final, con allowlist mínima y explícita para migraciones/historiales no productivos. <!-- sdd-owner: implementation -->
+- [x] Actualizar `ProveedorIdentidadSupabaseServidor` y consultas de membresías a `fam_miembros_hogar`, manteniendo `auth.getUser()`, cardinalidad única y errores controlados. <!-- sdd-owner: implementation -->
+- [x] Actualizar repositorios y mapeadores bajo `src/modulos/vehiculos/adaptadores/supabase/` a `fam_ve_vehiculos` y `fam_ve_eventos_vehiculo`, sin cambiar reglas del dominio. <!-- sdd-owner: implementation -->
+- [x] Actualizar `bootstrap-preflight.ts`, `OperacionesBootstrapPostgres`, runner y pruebas de `scripts/bootstrap-admin.ts` a `fam_hogares`, `fam_miembros_hogar` y `fam_roles_plataforma`, manteniendo idempotencia y abortos ante conflicto. <!-- sdd-owner: implementation -->
+- [x] Actualizar fixtures, cleanup, smoke tests y `scripts/validate-supabase-rls.sh` para el contrato final, con allowlist mínima y explícita para migraciones/historiales no productivos. <!-- sdd-owner: implementation -->
 
 ### TRIANGULATE
 
-- [ ] Ejecutar `npm test` y la matriz RLS para anónimo, no miembro, `editor`, `admin`, rol de plataforma, acceso cruzado y operaciones de vehículos; incluir prueba concurrente del último administrador. <!-- sdd-owner: implementation -->
-- [ ] Verificar bootstrap repetido, identidad ambigua, membresía duplicada, cero/múltiples membresías, UUID inválido y que ningún runtime ordinario obtiene credenciales `service_role`. <!-- sdd-owner: implementation -->
+- [x] Ejecutar `npm test` y la matriz RLS para anónimo, no miembro, `editor`, `admin`, rol de plataforma, acceso cruzado y operaciones de vehículos; incluir prueba concurrente del último administrador. <!-- sdd-owner: implementation -->
+- [x] Verificar bootstrap repetido, identidad ambigua, membresía duplicada, cero/múltiples membresías, UUID inválido y que ningún runtime ordinario obtiene credenciales `service_role`. <!-- sdd-owner: implementation -->
 - [ ] Ejecutar smoke end-to-end de alta, listado, desactivación, eventos, costes, kilometraje y vencimientos; comprobar que los datos históricos permanecen accesibles. <!-- sdd-owner: implementation -->
-- [ ] Ejecutar búsqueda final en código, configuración activa, scripts, validaciones y catálogo para demostrar que no quedan referencias productivas finales a `mv_*`. <!-- sdd-owner: implementation -->
+- [x] Ejecutar búsqueda final en código, configuración activa, scripts, validaciones y catálogo para demostrar que no quedan referencias productivas finales a `mv_*`. <!-- sdd-owner: implementation -->
 
 ### REFACTOR
 

@@ -35,13 +35,13 @@ const vehiculoActualizado = () =>
   });
 
 describe('RepositorioEventosSupabase', () => {
-  it('guardar() inyecta household_id en la fila enviada a mv_eventos_vehiculo', async () => {
+  it('guardar() inyecta household_id en la fila enviada a fam_ve_eventos_vehiculo', async () => {
     const { cliente, llamadas } = crearClienteSupabaseFalso();
     const repositorio = new RepositorioEventosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
     await repositorio.guardar(householdId, eventoValido());
 
-    expect(llamadas[0]?.tabla).toBe('mv_eventos_vehiculo');
+    expect(llamadas[0]?.tabla).toBe('fam_ve_eventos_vehiculo');
     const insert = llamadas[0]?.operaciones.find((op) => op.metodo === 'insert');
     const fila = insert?.args[0] as { household_id: string; vehiculo_id: string };
     expect(fila.household_id).toBe('11111111-1111-4111-8111-111111111111');
@@ -61,7 +61,7 @@ describe('RepositorioEventosSupabase', () => {
 
   it('guardar() propaga la violación de unicidad (23505) de un id de evento duplicado en vez de sobrescribirlo en silencio', async () => {
     const { cliente } = crearClienteSupabaseFalso({
-      error: { message: 'duplicate key value violates unique constraint "mv_eventos_vehiculo_pkey"', code: '23505' },
+      error: { message: 'duplicate key value violates unique constraint "fam_ve_eventos_vehiculo_pkey"', code: '23505' },
     });
     const repositorio = new RepositorioEventosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
@@ -106,7 +106,7 @@ describe('RepositorioEventosSupabase', () => {
       vehiculoActualizado: vehiculoActualizado(),
     });
 
-    expect(llamadas.map((llamada) => llamada.tabla)).toEqual(['mv_vehiculos', 'mv_eventos_vehiculo']);
+    expect(llamadas.map((llamada) => llamada.tabla)).toEqual(['fam_ve_vehiculos', 'fam_ve_eventos_vehiculo']);
     const operacionesEvento = llamadas[1]?.operaciones.map((op) => op.metodo) ?? [];
     expect(operacionesEvento).toContain('insert');
     expect(operacionesEvento).not.toContain('upsert');
@@ -115,7 +115,7 @@ describe('RepositorioEventosSupabase', () => {
   it('no confirma el evento si falla la actualización de kilometraje del vehículo', async () => {
     const { cliente, llamadas } = crearClienteSupabaseFalso(
       {},
-      { mv_vehiculos: { error: { message: 'fallo de conexión' } } },
+      { fam_ve_vehiculos: { error: { message: 'fallo de conexión' } } },
     );
     const repositorio = new RepositorioEventosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
@@ -126,16 +126,16 @@ describe('RepositorioEventosSupabase', () => {
       }),
     ).rejects.toThrow(/No se pudo actualizar el kilometraje/);
 
-    expect(llamadas.map((llamada) => llamada.tabla)).toEqual(['mv_vehiculos']);
+    expect(llamadas.map((llamada) => llamada.tabla)).toEqual(['fam_ve_vehiculos']);
   });
 
-  it('registra evento histórico (sin vehiculoActualizado) sin tocar mv_vehiculos', async () => {
+  it('registra evento histórico (sin vehiculoActualizado) sin tocar fam_ve_vehiculos', async () => {
     const { cliente, llamadas } = crearClienteSupabaseFalso();
     const repositorio = new RepositorioEventosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
     await repositorio.registrarEventoYActualizarKilometraje(householdId, { evento: eventoValido() });
 
-    expect(llamadas.map((llamada) => llamada.tabla)).toEqual(['mv_eventos_vehiculo']);
+    expect(llamadas.map((llamada) => llamada.tabla)).toEqual(['fam_ve_eventos_vehiculo']);
   });
 
   it('guardar() lanza ErrorAdaptadorSupabase con el código Postgres cuando la escritura falla', async () => {
@@ -157,7 +157,7 @@ describe('RepositorioEventosSupabase', () => {
 
   it('listarPorVehiculo() lanza ErrorAdaptadorSupabase con el código Postgres cuando la lectura falla', async () => {
     const { cliente } = crearClienteSupabaseFalso({
-      error: { message: 'permission denied for table mv_eventos_vehiculo', code: '42501' },
+      error: { message: 'permission denied for table fam_ve_eventos_vehiculo', code: '42501' },
     });
     const repositorio = new RepositorioEventosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
@@ -174,7 +174,7 @@ describe('RepositorioEventosSupabase', () => {
 
   it('listarConVencimiento() lanza ErrorAdaptadorSupabase con el código Postgres cuando la lectura falla', async () => {
     const { cliente } = crearClienteSupabaseFalso({
-      error: { message: 'permission denied for table mv_eventos_vehiculo', code: '42501' },
+      error: { message: 'permission denied for table fam_ve_eventos_vehiculo', code: '42501' },
     });
     const repositorio = new RepositorioEventosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
@@ -206,7 +206,7 @@ describe('RepositorioEventosSupabase', () => {
     it('lanza ErrorAdaptadorSupabase con código cuando falla la actualización del vehículo y NO registra el log de reconciliación (no hay estado inconsistente todavía)', async () => {
       const { cliente } = crearClienteSupabaseFalso(
         {},
-        { mv_vehiculos: { error: { message: 'permission denied', code: '42501' } } },
+        { fam_ve_vehiculos: { error: { message: 'permission denied', code: '42501' } } },
       );
       const repositorio = new RepositorioEventosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
@@ -228,7 +228,7 @@ describe('RepositorioEventosSupabase', () => {
     it('lanza ErrorAdaptadorSupabase con código cuando falla el guardado del evento y registra un log estructurado en el punto real de riesgo de atomicidad antes de relanzar', async () => {
       const { cliente } = crearClienteSupabaseFalso(
         {},
-        { mv_eventos_vehiculo: { error: { message: 'permission denied', code: '42501' } } },
+        { fam_ve_eventos_vehiculo: { error: { message: 'permission denied', code: '42501' } } },
       );
       const repositorio = new RepositorioEventosSupabase(cliente as unknown as ClienteSupabaseServidor);
 

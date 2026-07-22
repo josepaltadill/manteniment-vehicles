@@ -23,14 +23,14 @@ const vehiculoValido = () =>
   });
 
 describe('RepositorioVehiculosSupabase', () => {
-  it('guardar() inyecta household_id en la fila enviada a mv_vehiculos', async () => {
+  it('guardar() inyecta household_id en la fila enviada a fam_ve_vehiculos', async () => {
     const { cliente, llamadas } = crearClienteSupabaseFalso();
     const repositorio = new RepositorioVehiculosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
     await repositorio.guardar(householdId, vehiculoValido());
 
     expect(llamadas).toHaveLength(1);
-    expect(llamadas[0]?.tabla).toBe('mv_vehiculos');
+    expect(llamadas[0]?.tabla).toBe('fam_ve_vehiculos');
     const upsert = llamadas[0]?.operaciones.find((op) => op.metodo === 'upsert');
     expect(upsert).toBeDefined();
     const filaEnviada = upsert?.args[0] as { household_id: string; matricula: string };
@@ -113,7 +113,7 @@ describe('RepositorioVehiculosSupabase', () => {
 
   it('buscarPorId() lanza ErrorAdaptadorSupabase con el código Postgres cuando la lectura falla', async () => {
     const { cliente } = crearClienteSupabaseFalso({
-      error: { message: 'permission denied for table mv_vehiculos', code: '42501' },
+      error: { message: 'permission denied for table fam_ve_vehiculos', code: '42501' },
     });
     const repositorio = new RepositorioVehiculosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
@@ -130,7 +130,7 @@ describe('RepositorioVehiculosSupabase', () => {
 
   it('listar() lanza ErrorAdaptadorSupabase con el código Postgres cuando la lectura falla', async () => {
     const { cliente } = crearClienteSupabaseFalso({
-      error: { message: 'permission denied for table mv_vehiculos', code: '42501' },
+      error: { message: 'permission denied for table fam_ve_vehiculos', code: '42501' },
     });
     const repositorio = new RepositorioVehiculosSupabase(cliente as unknown as ClienteSupabaseServidor);
 
@@ -147,7 +147,7 @@ describe('RepositorioVehiculosSupabase', () => {
 
   it('existeMatricula() lanza ErrorAdaptadorSupabase con el código Postgres cuando la lectura falla', async () => {
     const { cliente } = crearClienteSupabaseFalso({
-      error: { message: 'permission denied for table mv_vehiculos', code: '42501' },
+      error: { message: 'permission denied for table fam_ve_vehiculos', code: '42501' },
     });
     const repositorio = new RepositorioVehiculosSupabase(cliente as unknown as ClienteSupabaseServidor);
 

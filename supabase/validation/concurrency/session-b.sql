@@ -17,7 +17,7 @@ select set_config('request.jwt.claim.role', 'authenticated', true);
 do $$
 begin
   begin
-    delete from public.mv_household_members
+    delete from public.fam_miembros_hogar
     where household_id = '10000000-0000-0000-0000-00000000000a'
       and user_id = '00000000-0000-0000-0000-0000000000a2';
     raise notice 'CASE|concurrency.session-b|delete-or-23514|delete|PASS';

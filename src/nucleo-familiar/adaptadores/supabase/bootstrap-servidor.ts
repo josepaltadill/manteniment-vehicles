@@ -1,8 +1,8 @@
 // Bootstrap SERVIDOR-ONLY del hogar/usuario de desarrollo (diseño §15.6/§15.7).
 //
 // Por qué no pasa por el cliente Supabase normal (anon key + RLS): la migración
-// NO otorga privilegio de insert sobre `mv_households` a `authenticated`
-// (solo select/update/delete), y `mv_household_members_insert_admin` exige YA
+// NO otorga privilegio de insert sobre `fam_hogares` a `authenticated`
+// (solo select/update/delete), y `fam_miembros_hogar_insert_admin` exige YA
 // ser admin del hogar para insertar la primera membresía. Es decir: RLS impide,
 // a propósito, que cualquier usuario autenticado normal se auto-nombre admin de
 // un hogar nuevo. El primer admin de un hogar solo puede sembrarse fuera de esa
@@ -12,7 +12,7 @@
 // aislado y `OperacionesBootstrapPostgres` lo implementa usando una conexión Postgres
 // administrativa que solo debe existir en un proceso server-only de bootstrap.
 //
-// La migración `20260711000000_mv_households_nombre_unique.sql` protege la creación
+// La migración `20260711000000_fam_hogares_nombre_unique.sql` protege la creación
 // concurrente de hogares. La reconsulta posterior se conserva como defensa adicional
 // para detectar datos históricos corruptos o un adaptador administrativo incorrecto.
 //
@@ -35,7 +35,7 @@ export class ErrorRaceBootstrapHogar extends Error {
     super(
       `Condición de carrera detectada al sembrar el hogar de desarrollo "${nombre}": ` +
         `se encontraron ${cantidadEncontrada} hogares con ese nombre justo después de crearlo. ` +
-        'La restricción `mv_households_nombre_key` debería impedir este estado; ' +
+        'La restricción `fam_hogares_nombre_key` debería impedir este estado; ' +
         'se aborta para evitar continuar con datos históricos corruptos o un adaptador administrativo incorrecto.',
     );
     this.name = 'ErrorRaceBootstrapHogar';

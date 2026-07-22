@@ -1,4 +1,4 @@
-// Adaptador Supabase de SERVIDOR para `mv_eventos_vehiculo`. Igual que el
+// Adaptador Supabase de SERVIDOR para `fam_ve_eventos_vehiculo`. Igual que el
 // repositorio de vehículos, solo debe importarse desde servidor.
 import type { Identificador } from '../../../../compartido/dominio/identificador';
 import type { EventoVehiculo } from '../../dominio/evento-vehiculo';
@@ -16,8 +16,8 @@ import {
 } from './mapeadores-supabase';
 import { errorAdaptadorSupabaseDesde } from '../../../../compartido/infraestructura/supabase/errores-adaptador';
 
-const TABLA_VEHICULOS = 'mv_vehiculos';
-const TABLA_EVENTOS = 'mv_eventos_vehiculo';
+const TABLA_VEHICULOS = 'fam_ve_vehiculos';
+const TABLA_EVENTOS = 'fam_ve_eventos_vehiculo';
 
 export class RepositorioEventosSupabase
   implements RepositorioEventosVehiculo, UnidadTrabajoVehiculos

@@ -8,15 +8,15 @@ values
   ('00000000-0000-0000-0000-0000000000e2', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'editor_b@example.test', '', now(), '{"provider":"email","providers":["email"]}', '{}'),
   ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'non_member@example.test', '', now(), '{"provider":"email","providers":["email"]}', '{}');
 
-insert into public.mv_households (id, nombre) values
+insert into public.fam_hogares (id, nombre) values
   ('10000000-0000-0000-0000-00000000000a', 'Household A'),
   ('20000000-0000-0000-0000-00000000000b', 'Household B');
-insert into public.mv_household_members (household_id, user_id, rol) values
+insert into public.fam_miembros_hogar (household_id, user_id, rol) values
   ('10000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000a1', 'admin'),
   ('10000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000a2', 'admin'),
   ('10000000-0000-0000-0000-00000000000a', '00000000-0000-0000-0000-0000000000e1', 'editor'),
   ('20000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-0000000000b1', 'admin'),
   ('20000000-0000-0000-0000-00000000000b', '00000000-0000-0000-0000-0000000000e2', 'editor');
-insert into public.mv_vehiculos (id, household_id, marca, modelo, combustible, matricula, anio, kilometros_actuales, estado, fecha_compra, fecha_alta_aplicacion) values
+insert into public.fam_ve_vehiculos (id, household_id, marca, modelo, combustible, matricula, anio, kilometros_actuales, estado, fecha_compra, fecha_alta_aplicacion) values
   ('30000000-0000-0000-0000-00000000000a', '10000000-0000-0000-0000-00000000000a', 'Marca', 'A', 'gasolina', 'A-100', 2020, 100, 'activo', now(), now()),
   ('40000000-0000-0000-0000-00000000000b', '20000000-0000-0000-0000-00000000000b', 'Marca', 'B', 'diesel', 'B-100', 2021, 200, 'activo', now(), now());

@@ -47,7 +47,7 @@ cleanup() {
     exit_code="$(final_exit_code "$exit_code" 'concurrency-process-still-live')"
   elif [[ "$safe_cleanup" == true && -n "$workspace" && -n "$container_id" ]] && owns_runtime; then
     # This stop is scoped to the generated project and is never run after an ambiguous guard.
-    if supabase stop --workdir "$workspace" >/dev/null 2>&1; then
+    if supabase stop --no-backup --workdir "$workspace" >/dev/null 2>&1; then
       rm -rf -- "$workspace"
       report 'PASS|cleanup|owned-runtime-stopped-and-workspace-removed'
     else
@@ -105,6 +105,7 @@ preflight() {
   [[ -f "$MIGRATIONS_DIR/20260710000000_supabase_persistence_short.sql" ]] || { block 'preflight|missing-base-migration'; return 1; }
   [[ -f "$MIGRATIONS_DIR/20260711000000_mv_households_nombre_unique.sql" ]] || { block 'preflight|missing-household-name-migration'; return 1; }
   [[ -f "$MIGRATIONS_DIR/20260712000000_mv_platform_roles.sql" ]] || { block 'preflight|missing-platform-roles-migration'; return 1; }
+  [[ -f "$MIGRATIONS_DIR/20260713000000_family_app_modularization.sql" ]] || { block 'preflight|missing-family-app-modularization-migration'; return 1; }
   [[ -f "$VALIDATION_DIR/config.toml" ]] || { block 'preflight|missing-config'; return 1; }
   require_command supabase || return 1
   require_command docker || return 1
@@ -134,7 +135,8 @@ create_workspace() {
   sed "s/__PROJECT_ID__/$project_id/" "$VALIDATION_DIR/config.toml" > "$workspace/supabase/config.toml"
   cat "$MIGRATIONS_DIR/20260710000000_supabase_persistence_short.sql" \
     "$MIGRATIONS_DIR/20260711000000_mv_households_nombre_unique.sql" \
-    "$MIGRATIONS_DIR/20260712000000_mv_platform_roles.sql" > "$workspace/migration.sql"
+    "$MIGRATIONS_DIR/20260712000000_mv_platform_roles.sql" \
+    "$MIGRATIONS_DIR/20260713000000_family_app_modularization.sql" > "$workspace/migration.sql"
   cp "$VALIDATION_DIR/fixtures.sql" "$workspace/fixtures.sql"
   cp "$VALIDATION_DIR/assertions.sql" "$workspace/assertions.sql"
   cp -R "$VALIDATION_DIR/concurrency" "$workspace/concurrency"
@@ -247,7 +249,7 @@ run_concurrency() {
     fail 'concurrency|missing-session-evidence'
     return 1
   fi
-  admins="$(timeout --kill-after=5s 20s docker exec "$container_id" psql -U postgres -d postgres -X -Atqc "select count(*) from public.mv_household_members where household_id = '10000000-0000-0000-0000-00000000000a' and rol = 'admin'")"
+  admins="$(timeout --kill-after=5s 20s docker exec "$container_id" psql -U postgres -d postgres -X -Atqc "select count(*) from public.fam_miembros_hogar where household_id = '10000000-0000-0000-0000-00000000000a' and rol = 'admin'")"
   if [[ "$admins" != '1' ]]; then
     fail "concurrency|final-admin-count|expected=1|observed=$admins"
     return 1

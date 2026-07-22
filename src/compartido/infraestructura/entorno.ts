@@ -1,8 +1,8 @@
 // Lectura y validación de variables de entorno para el adaptador Supabase de servidor.
 //
 // Deliberadamente NO se usan nombres `NEXT_PUBLIC_*`: ninguna de estas variables debe
-// llegar al bundle de cliente. El acceso a datos de aplicación (`mv_vehiculos`,
-// `mv_eventos_vehiculo`) solo ocurre desde servidor (ver diseño §6.2/§7.2 y tarea 9).
+// llegar al bundle de cliente. El acceso a datos de aplicación (`fam_ve_vehiculos`,
+// `fam_ve_eventos_vehiculo`) solo ocurre desde servidor (ver diseño §6.2/§7.2 y tarea 9).
 export type EntornoSupabase = Readonly<{
   url: string;
   anonKey: string;

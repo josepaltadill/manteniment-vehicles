@@ -28,7 +28,7 @@ export class ProveedorIdentidadSupabaseServidor implements ProveedorIdentidad {
     const { data, error } = await this.cliente.auth.getUser();
     if (error) reportarFalloOperativo('auth_get_user');
     if (error || !data.user) return { estado: 'anonimo' };
-    const respuesta = await this.cliente.from('mv_household_members')
+    const respuesta = await this.cliente.from('fam_miembros_hogar')
       .select('household_id, rol').eq('user_id', data.user.id).limit(2);
     if (respuesta.error) {
       reportarFalloOperativo('membership_query');

@@ -116,7 +116,7 @@ exit 1`);
       expect(result.stdout).toContain('PASS|concurrency|two-sessions|one-admin-remains');
       expect(result.stdout).toContain('PASS|gate|complete-runtime-validation');
       expect(result.stdout).toContain('SUMMARY|status=PASS|passed=3|failed=0|blocked=0|concurrency=passed');
-      expect(invocations).toContain('supabase stop --workdir');
+      expect(invocations).toContain('supabase stop --no-backup --workdir');
     } finally { await rm(tools, { force: true, recursive: true }); }
   });
 
@@ -128,6 +128,7 @@ exit 1`);
     expect(harness).toContain('run_sql "$workspace/fixtures.sql" || return 1');
     expect(harness).toContain('run_sql "$workspace/assertions.sql" || return 1');
     expect(harness).toContain('20260711000000_mv_households_nombre_unique.sql');
+    expect(harness).toContain('20260713000000_family_app_modularization.sql');
     expect(harness).toContain('missing-household-name-migration');
   });
 
@@ -312,7 +313,7 @@ exit 1`);
       expect(dockerExecInvocations).toHaveLength(8);
       expect(dockerExecInvocations.every((invocation) => invocation.includes('psql -U postgres -d postgres'))).toBe(true);
       expect(dockerExecInvocations.filter((invocation) => invocation.includes('-i db-owned'))).toHaveLength(6);
-      expect(invocations).toContain('supabase stop --workdir');
+      expect(invocations).toContain('supabase stop --no-backup --workdir');
     } finally { await rm(tools, { force: true, recursive: true }); }
   });
 
@@ -408,7 +409,7 @@ if [[ "$1" == exec ]]; then [[ "$*" == *current_database* ]] && echo postgres ||
 exit 1`);
       const result = runHarness({ env: { MV_FAKE_PROJECT_ID: 'mv-rls-validation-placeholder' }, path: `${tools}:/usr/bin:/bin` });
       const invocations = await readFile(marker, 'utf8');
-      const stopMatch = invocations.match(/supabase stop --workdir ([^\n]+)/);
+      const stopMatch = invocations.match(/supabase stop --no-backup --workdir ([^\n]+)/);
       expect(result.status).not.toBe(0);
       expect(result.stdout).toContain('BLOCKED|cleanup|stop-failed|workspace=');
       expect(stopMatch).not.toBeNull();

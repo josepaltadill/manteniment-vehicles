@@ -1,4 +1,4 @@
-// Adaptador Supabase de SERVIDOR para `mv_vehiculos`. Solo debe importarse desde
+// Adaptador Supabase de SERVIDOR para `fam_ve_vehiculos`. Solo debe importarse desde
 // server actions, Server Components o adaptadores de servidor (nunca desde
 // componentes cliente). RLS ya activa por hogar es la frontera real; este
 // adaptador es responsable de inyectar/filtrar `household_id` explícitamente en
@@ -10,7 +10,7 @@ import type { ClienteSupabaseServidor } from '../../../../compartido/infraestruc
 import { aFilaVehiculo, aVehiculoDesdeFila, type FilaVehiculo } from './mapeadores-supabase';
 import { errorAdaptadorSupabaseDesde } from '../../../../compartido/infraestructura/supabase/errores-adaptador';
 
-const TABLA = 'mv_vehiculos';
+const TABLA = 'fam_ve_vehiculos';
 
 export class RepositorioVehiculosSupabase implements RepositorioVehiculos {
   constructor(private readonly cliente: ClienteSupabaseServidor) {}

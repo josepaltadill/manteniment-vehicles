@@ -25,7 +25,7 @@ type FilaMembresia = Readonly<{ rol: string }>;
 // nombre con un tab o salto de línea al final no se reconocería como
 // duplicado de la variante con espacio normal. Este set de caracteres debe
 // coincidir exactamente con el del índice único en
-// supabase/migrations/20260711000000_mv_households_nombre_unique.sql.
+// supabase/migrations/20260711000000_fam_hogares_nombre_unique.sql.
 const CARACTERES_ESPACIO_SQL = "E' \\t\\n\\r'";
 
 /**
@@ -107,7 +107,7 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
   async buscarHogarPorNombre(nombre: string): Promise<FilaId | null> {
     return primeraFila<FilaId>(
       this.cliente.query(
-        `select id from public.mv_households
+        `select id from public.fam_hogares
          where lower(btrim(nombre, ${CARACTERES_ESPACIO_SQL})) = lower(btrim($1, ${CARACTERES_ESPACIO_SQL}))
          limit 1`,
         [nombre],
@@ -118,10 +118,10 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
   async crearHogar(nombre: string): Promise<FilaId> {
     const hogar = await primeraFila<FilaId>(
       this.cliente.query(
-        `insert into public.mv_households (nombre)
+        `insert into public.fam_hogares (nombre)
          values ($1)
          on conflict (lower(btrim(nombre, ${CARACTERES_ESPACIO_SQL})))
-         do update set nombre = mv_households.nombre
+         do update set nombre = fam_hogares.nombre
          returning id`,
         [nombre.trim()],
       ),
@@ -134,7 +134,7 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
   async contarHogaresPorNombre(nombre: string): Promise<number> {
     const fila = await primeraFila<FilaCantidad>(
       this.cliente.query(
-        `select count(*)::text as cantidad from public.mv_households
+        `select count(*)::text as cantidad from public.fam_hogares
          where lower(btrim(nombre, ${CARACTERES_ESPACIO_SQL})) = lower(btrim($1, ${CARACTERES_ESPACIO_SQL}))`,
         [nombre],
       ),
@@ -145,7 +145,7 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
   async buscarMembresia(householdId: string, userId: string): Promise<{ rol: RolUsuario } | null> {
     const fila = await primeraFila<FilaMembresia>(
       this.cliente.query(
-        `select rol from public.mv_household_members
+        `select rol from public.fam_miembros_hogar
          where household_id = $1 and user_id = $2 limit 1`,
         [householdId, userId],
       ),
@@ -160,7 +160,7 @@ export class OperacionesBootstrapPostgres implements OperacionesBootstrap {
 
   async crearMembresiaAdmin(householdId: string, userId: string): Promise<void> {
     await this.cliente.query(
-      `insert into public.mv_household_members (household_id, user_id, rol)
+      `insert into public.fam_miembros_hogar (household_id, user_id, rol)
        values ($1, $2, 'admin')
        on conflict (household_id, user_id) do nothing`,
       [householdId, userId],

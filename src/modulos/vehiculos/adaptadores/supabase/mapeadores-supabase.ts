@@ -2,13 +2,13 @@
 // `supabase/migrations/20260710000000_supabase_persistence_short.sql`.
 //
 // Reglas de este adaptador (ver diseño §6.2 y §7.1):
-// - Las tablas son `mv_vehiculos` y `mv_eventos_vehiculo`; no existen columnas
-//   `creado_en`/`actualizado_en` en `mv_vehiculos`: NO se mapean.
+// - Las tablas son `fam_ve_vehiculos` y `fam_ve_eventos_vehiculo`; no existen columnas
+//   `creado_en`/`actualizado_en` en `fam_ve_vehiculos`: NO se mapean.
 // - La columna de auditoría de eventos se llama `fecha_creacion`, no `creado_en`.
 // - Toda fila lleva `household_id`, inyectado explícitamente por el llamador
 //   (el dominio no conoce el hogar).
-// - `mv_eventos_vehiculo` usa la FK compuesta `(household_id, vehiculo_id)` hacia
-//   `mv_vehiculos (household_id, id)`; por eso toda fila de evento incluye ambos.
+// - `fam_ve_eventos_vehiculo` usa la FK compuesta `(household_id, vehiculo_id)` hacia
+//   `fam_ve_vehiculos (household_id, id)`; por eso toda fila de evento incluye ambos.
 import { crearIdentificador, type Identificador } from '../../../../compartido/dominio/identificador';
 import {
   crearEventoVehiculo,

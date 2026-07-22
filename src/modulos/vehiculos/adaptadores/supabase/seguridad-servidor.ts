@@ -4,7 +4,7 @@
 // del diseño y de `supabase/migrations/README.md`:
 // 1. Ningún componente cliente (`'use client'`) puede importar un adaptador
 //    Supabase de datos de app (`adaptadores/supabase/*`); el acceso a
-//    `mv_vehiculos`/`mv_eventos_vehiculo` es exclusivamente de servidor.
+//    `fam_ve_vehiculos`/`fam_ve_eventos_vehiculo` es exclusivamente de servidor.
 // 2. Ninguna clave privilegiada (`service_role`) puede aparecer como patrón de
 //    variable de entorno en código de producción.
 import { readFileSync, readdirSync, statSync } from 'node:fs';

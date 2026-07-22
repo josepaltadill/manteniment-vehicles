@@ -50,7 +50,7 @@ describe('ProveedorIdentidadSupabaseServidor', () => {
     await expect(resolver(cliente)).resolves.toMatchObject({
       estado: 'concedido', contexto: { actor: { rol: 'editor' }, householdId: { valor: HOGAR } },
     });
-    expect(llamadas[0]).toEqual({ tabla: 'mv_household_members', operaciones: [
+    expect(llamadas[0]).toEqual({ tabla: 'fam_miembros_hogar', operaciones: [
       { metodo: 'select', args: ['household_id, rol'] },
       { metodo: 'eq', args: ['user_id', USUARIO] },
       { metodo: 'limit', args: [2] },
