@@ -485,3 +485,16 @@ Evidencia estricta recibida para esta corrección: RED dirigido **18/19**, con f
 Esta entrada sustituye operativamente el diseño de marcador descrito arriba, sin borrar su historial. Cada ejecución recrea únicamente la base loopback de nombre fijo y ejecuta migraciones y fixtures con un runner `NOSUPERUSER`, `NOCREATEDB`, `NOCREATEROLE`, `NOINHERIT`, `NOREPLICATION` y `NOBYPASSRLS`, sin membresías ni configuración persistente. La conexión administrativa solo adquiere el bloqueo, recrea la base exacta y concede capacidades limitadas dentro de ella. Las cláusulas históricas `OWNER TO postgres` se adaptan exclusivamente en copias de ejecución, fuera de strings, comentarios y bloques dollar-quoted; el SQL original sigue alimentando las aserciones estáticas.
 
 Evidencia final: PostgreSQL dirigido **19/19**, `npx tsc --noEmit` aprobado, suite estándar **377 aprobadas y 16 omitidas**, y build de producción aprobado. No se creó ningún worktree adicional y `tsconfig.tsbuildinfo` fue restaurado exactamente tras la validación.
+
+---
+
+## PR 2 — sincronización de evidencia de atomicidad/concurrencia (PR #38)
+
+**Alcance:** sincronización de artefactos únicamente; no se modificó código, pruebas, base de datos, contenedores ni servicios.
+
+- **Tarea completada y checkbox persistido:** `Crear pruebas de atomicidad observable...` está ahora en `[x]` en `tasks.md`.
+- **Implementación verificada:** `src/compartido/pruebas/migracion-family-app-atomicidad-concurrencia.test.ts`, incorporado por `b78c911` (`test(database): cover migration atomicity under concurrency`) y contenido en el merge `c4a342eaa38bc410ba2205215eed674586a5f0b3` / PR #38. `main` y `origin/main` resuelven ambos al merge.
+- **Corrección vigente (sustituye las afirmaciones de completitud anteriores de esta sección):** la cobertura/evidencia es parcial: verifica rollback ante `lock_timeout` (`55P03`) y `statement_timeout` (`57014`), además de visibilidad antes/después, pero no observa accesos durante los renombres ni varía el orden de locks para demostrar ausencia de deadlock; por ello la tarea permanece pendiente `[ ]`.
+- **TDD Cycle Evidence:** RED y GREEN ocurrieron en el work unit incorporado; esta sincronización no reejecuta pruebas porque no cambia comportamiento y conserva su evidencia durable. No hay desviación de diseño.
+- **Fuera de alcance / pendiente:** las tareas PR 2 de preflight, rollback/fix-forward, catálogo y determinismo, más los demás ítems sin marcar y todos los gates parent-owned, permanecen sin cambios. PR 2 y PR 3 siguen requiriendo activación coordinada.
+- **Verificación de sincronización:** se releyeron `tasks.md` y este progreso; `git diff --check` pasó tras ambos cambios. Límite/PR: `feature-branch-chain`; esta entrada solo sincroniza el work unit ya merged y no abre una nueva frontera de entrega.
