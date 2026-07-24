@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { Client, type ClientConfig } from 'pg';
 import { parseIntoClientConfig } from 'pg-connection-string';
 import { describe, expect, it } from 'vitest';
+import { inspeccionarPreflightCatalogoFamiliar } from '../../../supabase/validation/preflight-catalogo-family-app';
 
 const rutaMigracion = new URL(
   '../../../supabase/migrations/20260713000000_family_app_modularization.sql',
@@ -473,6 +474,43 @@ ejecutarPostgres('migración modular en PostgreSQL local efímero', () => {
         unrelated_policy_count: 1,
         unrelated_trigger_count: 1,
       });
+    });
+  });
+
+  it('inventa el catálogo pre-corte y bloquea un contrato final conflictivo', async () => {
+    await conBaseDedicada(conexiones!, async (cliente) => {
+      const historico = await Promise.all(rutasHistoricas.map((ruta) => readFile(ruta, 'utf8')))
+        .then((sql) => sql.join('\n'));
+      await cliente.query(adaptarPropietarioParaRunner(historico));
+      await cliente.query('create index mv_vehiculos_catalogo_preflight_idx on public.mv_vehiculos (marca)');
+
+      const inventario = await inspeccionarPreflightCatalogoFamiliar(cliente);
+      expect(inventario.objetosOrigen).toHaveLength(5);
+      expect(inventario.objetosOrigen.map(({ nombre, propietario }) => ({ nombre, propietario }))).toEqual([
+        { nombre: 'mv_eventos_vehiculo', propietario: ROL_RESTRINGIDO },
+        { nombre: 'mv_household_members', propietario: ROL_RESTRINGIDO },
+        { nombre: 'mv_households', propietario: ROL_RESTRINGIDO },
+        { nombre: 'mv_platform_roles', propietario: ROL_RESTRINGIDO },
+        { nombre: 'mv_vehiculos', propietario: ROL_RESTRINGIDO },
+      ]);
+      const vehiculos = inventario.objetosOrigen.find(({ nombre }) => nombre === 'mv_vehiculos')!;
+      const householdId = (vehiculos.definicion as Array<{ nombre: string; tipo: string }>).find(({ nombre }) => nombre === 'household_id');
+      expect(householdId).toEqual({ nombre: 'household_id', tipo: 'uuid', no_nulo: true });
+      const dependenciasIndice = inventario.dependencias.filter(({ objetoDependiente }) => objetoDependiente === 'mv_vehiculos_catalogo_preflight_idx');
+      expect(dependenciasIndice).toHaveLength(1);
+      expect({ tablaOrigen: dependenciasIndice[0]?.tablaOrigen, tipoDependencia: dependenciasIndice[0]?.tipoDependencia, claseDependiente: dependenciasIndice[0]?.claseDependiente, claseReferencia: dependenciasIndice[0]?.claseReferencia, oidReferencia: dependenciasIndice[0]?.oidReferencia }).toEqual({ tablaOrigen: 'mv_vehiculos', tipoDependencia: 'a', claseDependiente: '1259', claseReferencia: '1259', oidReferencia: vehiculos.oid });
+      expect(dependenciasIndice[0]?.definicion).toContain('CREATE INDEX');
+      expect(inventario.dependencias.filter(({ tablaOrigen, tipoDependencia }) => tablaOrigen === 'mv_vehiculos' && tipoDependencia === 'i').map(({ objetoDependiente, claseDependiente, subobjetoDependiente, claseReferencia, oidReferencia, subobjetoReferencia, definicion }) => ({ objetoDependiente, claseDependiente, subobjetoDependiente, claseReferencia, oidReferencia, subobjetoReferencia, definicion }))).toEqual([
+        { objetoDependiente: 'type mv_vehiculos', claseDependiente: '1247', subobjetoDependiente: '0', claseReferencia: '1259', oidReferencia: vehiculos.oid, subobjetoReferencia: '0', definicion: 'type mv_vehiculos' },
+        { objetoDependiente: `pg_toast_${vehiculos.oid}`, claseDependiente: '1259', subobjetoDependiente: '0', claseReferencia: '1259', oidReferencia: vehiculos.oid, subobjetoReferencia: '0', definicion: `toast table pg_toast.pg_toast_${vehiculos.oid}` },
+      ]);
+
+      await cliente.query('create type public.fam_hogares as enum (\'conflicto\')');
+      await expect(inspeccionarPreflightCatalogoFamiliar(cliente)).rejects.toThrow(/fam_hogares/);
+      await cliente.query('drop type public.fam_hogares');
+
+      await cliente.query('create table public.fam_hogares (id uuid primary key)');
+      await expect(inspeccionarPreflightCatalogoFamiliar(cliente)).rejects.toThrow(/fam_hogares/);
     });
   });
 });

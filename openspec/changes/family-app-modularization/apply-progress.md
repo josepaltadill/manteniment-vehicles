@@ -566,3 +566,58 @@ Límite/revisión: slice aislado, máximo 400 líneas. Rutas cambiadas: `src/com
 `RELIABILITY-001` sustituye los sleeps de 25/150 ms por una barrera observable: el observador retiene dos advisory locks transaccionales, verifica en `pg_locks` que los dos PID exactos poseen sus primeros `ACCESS EXCLUSIVE`, y solo entonces libera ambos migradores. La mutación desactiva localmente `lock_timeout` y `statement_timeout`, por lo que el único desenlace de contención aceptado sigue siendo un `40P01` y un commit; no cambia configuración persistente ni SQL productivo.
 
 RED dirigido: con `lock_timeout='10ms'`, el test anterior falló 1/4 porque no produjo ningún `40P01`. GREEN: 4/4. TRIANGULATE: cinco ejecuciones consecutivas 4/4; regresión de migración 18/18 con 1 omitida; `npm test` 377/377 con 21 omitidas; `npx tsc --noEmit --incremental false` pasó sin alterar `tsconfig.tsbuildinfo` (`cfb091047a753450fdc41b99b4b9f835fa98a1b6`); `git diff --check` pasó. La tarea de atomicidad/concurrencia permanece `[x]`; no cambió ninguna otra checkbox.
+
+---
+
+## Apply forecast — PR 2 preflight evidence blocked before RED
+
+```yaml
+schemaName: gentle-ai.sdd-status
+changeName: family-app-modularization
+artifactStore: both
+applyState: ready
+nextRecommended: resolve-delivery-path
+actionContext: { mode: repo-local, workspaceRoot: /home/josep/proyectos/family-app, allowedEditRoots: [/home/josep/proyectos/family-app] }
+warning: "No production/test edit was made; the next unchecked task exceeds the 400-line work-unit cap."
+```
+
+Selected first dependency-ready unchecked implementation row after atomicity/concurrency: `Crear pruebas de preflight que fallen ante objetos fam_* conflictivos, consumidores externos mv_* no clasificados, invariantes rotas, backup no recuperable o dependencias de catálogo no inventariadas.` It requires five independently observable failure modes spanning an operational preflight runner, PostgreSQL catalog/dependency queries, backup-evidence intake, external-consumer classification, and focused isolated-database tests. Existing migration and RLS scripts have no such shared preflight surface; the migration checks only source/final table presence.
+
+Forecast before code edits: **approximately 470–560 changed lines** (preflight implementation 210–260, focused RED/GREEN/triangulation tests 180–220, task/progress evidence 80). This cannot fit the hard 400-line budget and no size exception is authorized. Strict TDD did not start: no RED test, production change, test command, database operation, or checkbox update occurred. `tsconfig.tsbuildinfo` remains unmodified.
+
+Required minimal delivery boundary: **PR 2C-1 — catalog-only preflight** (conflicting `fam_*` objects, target OID/definition inventory, dependencies via `pg_depend`, and explicit failure when a required catalog record is absent), estimated **300–360 lines** including tests/evidence. Defer backup recoverability, external consumer classification, and data-invariant checks to PR 2C-2; those require a separate operational evidence contract. Parent-owned activation rows remain unchanged.
+
+---
+
+## PR 2C-1 — catálogo preflight aislado (completado como slice parcial)
+
+Esta entrada **sustituye el pronóstico anterior con el resultado real**: se implementó exclusivamente el inventario de catálogo. `supabase/validation/preflight-catalogo-family-app.ts` consulta sin mutar las cinco tablas origen `mv_*`, inventaría sus OIDs, propietario y definición de columnas, rechaza cualquier objeto final `fam_*` conflictivo e inventaría dependencias de `pg_depend`, incluidas definiciones de índices. Falla cerrado si falta una tabla fuente requerida o si existe un contrato final conflictivo.
+
+### TDD Cycle Evidence
+| Fase | Evidencia |
+|---|---|
+| Safety net | `npx vitest run src/compartido/pruebas/migracion-family-app-modularization.test.ts` — 18 pasan, 1 omitida. |
+| RED | El nuevo test `preflight-catalogo-family-app.test.ts` falló al no existir el módulo de producción. |
+| GREEN | Los tests unitarios enfocados pasaron 3/3 tras la implementación mínima. |
+| TRIANGULATE | PostgreSQL loopback aislado: `SUPABASE_BOOTSTRAP_DATABASE_URL=<local 127.0.0.1:54322> npx vitest run ...migracion-family-app-modularization.test.ts ...preflight-catalogo-family-app.test.ts` — 23/23; comprueba inventario real, definición `household_id`, índice dependiente y bloqueo ante `fam_hogares` conflictivo. Los unit tests cubren además una tabla origen faltante. |
+| REFACTOR | Las tres consultas se serializaron para no solapar `pg.Client.query()` y el inventario de dependencias pasó de solo relaciones a todos los registros de `pg_depend`, conservando definición de índice cuando aplica. |
+
+Verificación final: `npm test` — 49 archivos pasan, 3 omitidos; 380 pasan, 22 omitidos. `npx tsc --noEmit --incremental false` y `git diff --check` pasan; `tsconfig.tsbuildinfo` permanece igual a `HEAD`.
+
+La checkbox global de preflight permanece **`[ ]`** deliberadamente: PR 2C-1 no cubre backup recuperable, clasificación de consumidores externos ni invariantes amplias; esos criterios siguen diferidos a PR 2C-2. No se modificó ninguna otra checkbox ni acción parent-owned. Sin desviación de diseño, migración productiva, runtime, instancia compartida, commit, push o activación.
+
+### Corrección de gate independiente — semántica completa y orden estable de `pg_depend`
+
+Esta corrección sustituye la afirmación anterior sobre dependencias: el inventario ahora une la referencia a tabla **solo** con `d.refclassid = 'pg_class'::regclass and origen.oid = d.refobjid`, por lo que no atribuye OIDs de otros catálogos a las cinco tablas. Ya no excluye `d.deptype = 'i'`; conserva dependencias internas junto a las demás. Cada salida expone `classid`, `objid`, `objsubid`, `refclassid`, `refobjid`, `refobjsubid`, tipo y definición, y el `ORDER BY` usa todos esos campos como desempate estable.
+
+TDD de corrección: safety net unitario 3/3 y PostgreSQL aislado 20/20. RED: los nuevos expected exactos fallaron porque faltaban las claves de identidad de catálogo. GREEN: el guard de clase de referencia, la inclusión `i` y el mapeo de claves hicieron pasar el unitario 3/3. TRIANGULATE: PostgreSQL loopback 23/23 verifica el orden exacto de las cinco tablas, las dos filas internas de `mv_vehiculos` (`type` y toast), el índice dependiente y el conflicto final. REFACTOR: se eliminaron aserciones `arrayContaining` de estas dependencias y se conservaron representaciones deterministas. `npm test` sigue en 49 archivos/380 tests pasados (3/22 omitidos); TypeScript incremental false y diff check pasan, sin cambio de `tsconfig.tsbuildinfo`.
+
+La checkbox global sigue `[ ]` y PR 2C-2 sigue siendo necesaria; esta corrección no añadió backup, consumidores externos, invariantes amplias ni otro criterio.
+
+### Corrección acotada RELIABILITY-001 — conflictos del namespace de tipos
+
+La detección final consulta ahora `pg_type` unido a su `pg_namespace`, conserva el OID exacto y ordena por nombre y OID. Así bloquea tanto el row type de una relación final existente como un tipo independiente `public.fam_*`, cualquiera de los cuales impide el renombre de tabla; no añade criterios diferidos de PR 2C-2.
+
+TDD estricto: RED unitario 1/3 por contrato todavía basado en `pg_class`; RED PostgreSQL 19/20 porque un enum independiente `public.fam_hogares` no fue detectado. GREEN: unitario 3/3 y PostgreSQL loopback aislado 20/20. La triangulación conserva el caso de tabla conflictiva y fija en el unitario el uso de `pg_type`, la ausencia de `pg_class` y el orden determinista.
+
+Verificación: `npm test` — 49 archivos aprobados, 3 omitidos; 380 tests aprobados, 22 omitidos. `npx tsc --noEmit --incremental false` aprobó. La checkbox global de preflight permanece `[ ]`; backup recuperable, consumidores externos e invariantes amplias siguen en PR 2C-2.
