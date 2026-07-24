@@ -498,3 +498,71 @@ Evidencia final: PostgreSQL dirigido **19/19**, `npx tsc --noEmit` aprobado, sui
 - **TDD Cycle Evidence:** RED y GREEN ocurrieron en el work unit incorporado; esta sincronización no reejecuta pruebas porque no cambia comportamiento y conserva su evidencia durable. No hay desviación de diseño.
 - **Fuera de alcance / pendiente:** las tareas PR 2 de preflight, rollback/fix-forward, catálogo y determinismo, más los demás ítems sin marcar y todos los gates parent-owned, permanecen sin cambios. PR 2 y PR 3 siguen requiriendo activación coordinada.
 - **Verificación de sincronización:** se releyeron `tasks.md` y este progreso; `git diff --check` pasó tras ambos cambios. Límite/PR: `feature-branch-chain`; esta entrada solo sincroniza el work unit ya merged y no abre una nueva frontera de entrega.
+
+---
+
+## Apply gate — atomicity/concurrency completion correction
+
+```yaml
+schemaName: gentle-ai.sdd-status
+changeName: family-app-modularization
+artifactStore: both
+applyState: ready
+nextRecommended: apply
+actionContext: { mode: repo-local, workspaceRoot: /home/josep/proyectos/family-app, allowedEditRoots: [/home/josep/proyectos/family-app] }
+```
+
+No code or test was edited. The authoritative task is visibly pending: `Crear pruebas de atomicidad observable... <!-- sdd-owner: implementation; evidence-status: partial -->`. The parent supplied `auto-forecast`, but the workload guard requires an explicit resolved delivery path because the task forecast says both `Chained PRs recommended: Yes` and `400-line budget risk: High`. The requested one-work-unit scope does not identify the required delivery mode (`auto-chain` with the PR boundary, or an explicit `size:exception`/`exception-ok`).
+
+Verified before stopping: `HEAD` and `main` are `d552c0bb72e5ae19ed3f6a96acd57c2396ff4ad3`, which contains the required base; the workspace has no reported changes; the task remains `[ ]`. Required implementation evidence is still missing: (1) reader/writer observations while rename execution is in progress, with no mixed contract; and (2) varied lock ordering that detects a lock-order regression/deadlock. Parent-owned lifecycle rows remain unchanged.
+
+TDD did not start because the workload gate blocked before the RED edit. No checkbox was updated. Engram progress mirror is updated cumulatively with this decision.
+
+---
+
+## PR 2 — atomicidad/concurrencia: evidencia completa del corte aislado
+
+### Estado y límite de entrega
+```yaml
+schemaName: gentle-ai.sdd-status
+changeName: family-app-modularization
+artifactStore: both
+applyState: ready
+nextRecommended: apply
+actionContext: { mode: repo-local, workspaceRoot: /home/josep/proyectos/family-app, allowedEditRoots: [/home/josep/proyectos/family-app] }
+delivery: { mode: isolated-slice, capChangedLines: 400 }
+```
+La decisión posterior aprobó este slice aislado. Solo se completó la tarea de atomicidad/concurrencia; no se mezcló preflight, rollback/fix-forward, catálogo, consumidores ni acciones parent-owned.
+
+### Tarea completada y checkbox persistido
+- [x] Crear pruebas de atomicidad observable que fallen si un lector/escritor concurrente ve una mezcla de objetos `mv_*`/`fam_*`, si el orden de locks permite deadlock, o si `lock_timeout`/`statement_timeout` deja renombres parciales en lugar de rollback completo. <!-- sdd-owner: implementation; evidence-status: complete -->
+
+`tasks.md` se actualizó inmediatamente y se releerá antes de cerrar. No se modificó ninguna fila parent-owned.
+
+### TDD Cycle Evidence
+| Fase | Evidencia |
+|---|---|
+| RED | La nueva observación de renombre activo falló: `La migración no alcanzó la ventana observable después del primer renombre`. El primer detector dependía del texto de la consulta completa de PostgreSQL y no podía observar la ventana. |
+| GREEN | La instrumentación solo de prueba etiqueta la sesión después del primer `ALTER TABLE ... RENAME` y durante `pg_sleep(0.25)`. Durante esa ventana, lector (`SELECT` sobre `mv_vehiculos`) y escritor (`UPDATE` sobre `mv_vehiculos`) con `lock_timeout` reciben ambos `55P03`; no pueden observar un contrato mezclado. Tras el commit, el observador ve únicamente los cinco `fam_*`. |
+| TRIANGULATE | El caso de orden canónico contra orden inverso, instrumentado en dos migradores, produce exactamente un `40P01` y un commit; eso demuestra que el test es sensible a la regresión de orden, mientras el caso preexistente de dos migraciones canónicas conserva ausencia de `40P01`. El caso de `statement_timeout` sigue probando rollback completo con `57014`. |
+| REFACTOR | Se extrajeron helpers locales para esperar la ventana y construir el orden de locks instrumentado. No cambió SQL productivo, runtime, fixtures, servicios ni la base compartida. |
+
+### Verificación
+- `SUPABASE_BOOTSTRAP_DATABASE_URL=<postgres local exacto> npx vitest run src/compartido/pruebas/migracion-family-app-atomicidad-concurrencia.test.ts` — RED: 1 fallo / 3 pasan; GREEN: 4/4 pasan con PostgreSQL local aislado.
+- `npx vitest run src/compartido/pruebas/migracion-family-app-modularization.test.ts` — 18 pasan, 1 omitido.
+- `npm test` — 48 archivos pasan, 3 omitidos; 377 pasan, 21 omitidos.
+- `npx tsc --noEmit` — pasa; `tsconfig.tsbuildinfo` se restauró si era necesario.
+- `git diff --check` — pasa.
+
+### Alcance, desviaciones y pendientes
+Sin desviación de diseño. Los accesos bloqueados se realizan mientras la migración está activa después del primer renombre; el observador no ve un estado mixto y, después del commit, ve solo el contrato final. El test de orden inverso es deliberadamente una mutación de prueba para probar sensibilidad a deadlock, no una ruta productiva.
+
+Límite/revisión: slice aislado, máximo 400 líneas. Rutas cambiadas: `src/compartido/pruebas/migracion-family-app-atomicidad-concurrencia.test.ts`, `openspec/changes/family-app-modularization/tasks.md`, `openspec/changes/family-app-modularization/apply-progress.md`. Permanecen sin marcar todas las otras tareas PR 2–4 y las acciones parent-owned; la siguiente unidad debe ser una sola de esas tareas.
+
+---
+
+## Corrección acotada `review-atomicity-concurrency-20260724`
+
+`RELIABILITY-001` sustituye los sleeps de 25/150 ms por una barrera observable: el observador retiene dos advisory locks transaccionales, verifica en `pg_locks` que los dos PID exactos poseen sus primeros `ACCESS EXCLUSIVE`, y solo entonces libera ambos migradores. La mutación desactiva localmente `lock_timeout` y `statement_timeout`, por lo que el único desenlace de contención aceptado sigue siendo un `40P01` y un commit; no cambia configuración persistente ni SQL productivo.
+
+RED dirigido: con `lock_timeout='10ms'`, el test anterior falló 1/4 porque no produjo ningún `40P01`. GREEN: 4/4. TRIANGULATE: cinco ejecuciones consecutivas 4/4; regresión de migración 18/18 con 1 omitida; `npm test` 377/377 con 21 omitidas; `npx tsc --noEmit --incremental false` pasó sin alterar `tsconfig.tsbuildinfo` (`cfb091047a753450fdc41b99b4b9f835fa98a1b6`); `git diff --check` pasó. La tarea de atomicidad/concurrencia permanece `[x]`; no cambió ninguna otra checkbox.
